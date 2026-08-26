@@ -69,6 +69,28 @@ has rooted the account, issued a grant allowlisting the **devnet INTENTS** id
 and set RELAYER_KEYPAIR. Otherwise need_human_signature / need_human_setup.
 swap/deploy/call still stub.
 
+
+## One command (devnet)
+
+See [GETTING-STARTED.md](./GETTING-STARTED.md). Human wallet is the only secret they keep.
+Agent and relayer are host files mode 0600. Relayer pays fees. Human funds vaults.
+Bot never holds SOL. CORE/INTENTS ids are the real devnet ones. swap/deploy/call still stub.
+
+```bash
+export GROKCHAIN_ROOT_KEYPAIR=$HOME/.config/solana/id.json
+npx -y github:grokloop/grokchain-mcp grokchain setup --devnet
+```
+
+The default `npx github:grokloop/grokchain-mcp` needs the binary name `grokchain`.
+`setup --devnet` does not send a pay. After this, a Grok bot can call pay.
+
+Clone fallback:
+
+```bash
+git clone https://github.com/grokloop/grokchain-mcp && cd grokchain-mcp && npm i && npm run build && node dist/cli.js setup --devnet
+```
+
+
 ## Install and run
 
 Node 20+.
@@ -104,7 +126,7 @@ file mode 0600 and print the pubkey only.
 
 ## Human CLI
 
-See HUMAN.md.
+See GETTING-STARTED.md and HUMAN.md.
 
     grokchain root create-account
     grokchain agent init
@@ -116,6 +138,7 @@ See HUMAN.md.
     grokchain paymaster fund --sol 0.02
     grokchain root revise-grant
     grokchain root revoke-grant --agent PK
+    grokchain setup --devnet
     grokchain status
 
 On localnet, `--programs` is the local-only INTENTS id

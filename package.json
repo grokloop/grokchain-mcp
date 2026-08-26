@@ -15,7 +15,8 @@
     "config",
     "HUMAN.md",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "GETTING-STARTED.md"
   ],
   "engines": {
     "node": ">=20"
@@ -24,7 +25,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "tsx --test tests/*.test.ts",
-    "grokchain": "node dist/cli.js"
+    "grokchain": "node dist/cli.js",
+    "prepare": "tsc"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.0",

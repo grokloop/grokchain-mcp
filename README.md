@@ -28,13 +28,30 @@ Chain pays.
 | check_grant | implemented CORE client (local-only, lands only on local validator + key path) |
 | pay | implemented INTENTS client (local-only intents id). Relayer fee-pays. Human-funded vaults. Lands only if both local programs are running. |
 | swap / deploy / call | stub (IntentStub) |
-| No public-cluster deployment | Neither CORE nor INTENTS is live. |
+| No public-cluster deployment | Neither CORE nor INTENTS is live. Still local-only until CORE + PROGRAMS send real deployed ids. A grokchain-devnet config path exists but will not start without them. |
 
 Optional read-only: get_account, get_grant.
 
 pay is implemented against the local-only INTENTS program. It does not send a
 system transfer. Agent signs. Relayer is the fee payer. Human-funded SpendVault
 is the SOL source. Optional sponsor reimburses the relayer from YOUR paymaster.
+
+
+## Devnet
+
+`GROKCHAIN_CLUSTER=devnet` plus `config/devnet.json`, or `GROKCHAIN_CONFIG`, or
+`grokchain --config config/devnet.json`. Env `GROKCHAIN_PROGRAM_ID` /
+`GROKCHAIN_INTENTS_PROGRAM_ID` override file values if set.
+
+Real deployed program ids only. Fill `config/devnet.json` ONLY with real ids
+from CORE / PROGRAMS. Never the two local-only ids
+(`8WDhHSfrz6hMkmX7WteAAmyuWFLryHM2Kfc1r4k8EFXE` and
+`AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2`). Those are refused — they are
+local-only, not a deployed program, not valid on devnet. `null` means not
+deployed yet. The slot is empty until CORE and PROGRAMS send ids. Do not invent
+ids.
+
+Relayer still fee-pays. Human still funds vaults.
 
 ## Install and run
 
@@ -43,6 +60,8 @@ Node 20+.
 
 GROKCHAIN_CLUSTER: localnet (default), devnet, or mainnet-beta
 GROKCHAIN_RPC_URL: RPC URL (default follows cluster)
+GROKCHAIN_CONFIG: path to JSON config (e.g. config/devnet.json)
+
 GROKCHAIN_PROGRAM_ID: CORE id; required except localnet
 GROKCHAIN_INTENTS_PROGRAM_ID: INTENTS id; required except localnet
 GROKCHAIN_ROOT_KEYPAIR: path to the human wallet file

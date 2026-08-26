@@ -32,6 +32,11 @@ CORE is not deployed. INTENTS is not deployed. Not on a public cluster. There is
 - The local-only INTENTS default id is used **only** when cluster is `localnet`. Never present it as a shipped deployment.
 - `pay` is real against the local INTENTS program. It lands only if both local programs are running.
 
+## Devnet
+
+`GROKCHAIN_CLUSTER=devnet` plus `config/devnet.json` or `GROKCHAIN_CONFIG` or `grokchain --config config/devnet.json`. Real deployed ids only. The two local-only ids are refused. The slot is empty until CORE and PROGRAMS send ids. Do not invent a live/devnet program id. Relayer still fee-pays. Human still funds vaults. The path will not start without those ids.
+
+
 ## Never ask for keys. Never hold SOL.
 
 Never ask for a seed, mnemonic, private key, secret key, or keypair JSON.
@@ -44,6 +49,7 @@ Env vars name **paths**, not secrets:
 
 - `GROKCHAIN_CLUSTER` (`localnet` default)
 - `GROKCHAIN_RPC_URL`
+- `GROKCHAIN_CONFIG` (path to JSON, e.g. config/devnet.json)
 - `GROKCHAIN_PROGRAM_ID` (CORE; required except localnet)
 - `GROKCHAIN_INTENTS_PROGRAM_ID` (INTENTS; required except localnet)
 - `GROKCHAIN_ROOT_KEYPAIR` (path)

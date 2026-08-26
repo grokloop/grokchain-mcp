@@ -1,46 +1,243 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
+import { clusterNotes, loadConfig } from "../src/config.js";
 import { LOCAL_ONLY_INTENTS_PROGRAM_ID, LOCAL_ONLY_PROGRAM_ID } from "../src/constants.js";
 
-test("localnet default program ids are only used when cluster is localnet", async () => {
-  const prevCluster = process.env.GROKCHAIN_CLUSTER;
-  const prevProgram = process.env.GROKCHAIN_PROGRAM_ID;
-  const prevIntents = process.env.GROKCHAIN_INTENTS_PROGRAM_ID;
+// TEST FIXTURES only — well-known Solana program ids. Not Grok Chain deployments.
+const FIXTURE_CORE = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+const FIXTURE_INTENTS = "Memo111111111111111111111111111111111111111";
+
+const ENV_KEYS = [
+  "GROKCHAIN_CLUSTER",
+  "GROKCHAIN_RPC_URL",
+  "GROKCHAIN_PROGRAM_ID",
+  "GROKCHAIN_INTENTS_PROGRAM_ID",
+  "GROKCHAIN_CONFIG",
+] as const;
+
+type EnvSnap = Record<(typeof ENV_KEYS)[number], string | undefined>;
+
+function snapshotEnv(): EnvSnap {
+  const snap = {} as EnvSnap;
+  for (const k of ENV_KEYS) snap[k] = process.env[k];
+  return snap;
+}
+
+function restoreEnv(snap: EnvSnap): void {
+  for (const k of ENV_KEYS) {
+    if (snap[k] === undefined) delete process.env[k];
+    else process.env[k] = snap[k];
+  }
+}
+
+function clearIds(): void {
+  delete process.env.GROKCHAIN_PROGRAM_ID;
+  delete process.env.GROKCHAIN_INTENTS_PROGRAM_ID;
+  delete process.env.GROKCHAIN_CONFIG;
+  delete process.env.GROKCHAIN_RPC_URL;
+}
+
+function writeTempConfig(obj: unknown): string {
+  const dir = mkdtempSync(path.join(tmpdir(), "grokchain-cfg-"));
+  const p = path.join(dir, "devnet.json");
+  writeFileSync(p, JSON.stringify(obj, null, 2));
+  return p;
+}
+
+const REPO_DEVNET_JSON = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../config/devnet.json",
+);
+
+test("localnet still defaults to the two local-only ids", () => {
+  const snap = snapshotEnv();
   try {
-    delete process.env.GROKCHAIN_PROGRAM_ID;
-    delete process.env.GROKCHAIN_INTENTS_PROGRAM_ID;
+    clearIds();
     process.env.GROKCHAIN_CLUSTER = "localnet";
-    const { loadConfig } = await import("../src/config.js");
     const cfg = loadConfig();
     assert.equal(cfg.cluster, "localnet");
     assert.equal(cfg.programId.toBase58(), LOCAL_ONLY_PROGRAM_ID);
     assert.equal(cfg.intentsProgramId.toBase58(), LOCAL_ONLY_INTENTS_PROGRAM_ID);
     assert.equal(cfg.localOnlyProgram, true);
     assert.equal(cfg.localOnlyIntents, true);
-
-    process.env.GROKCHAIN_CLUSTER = "devnet";
-    assert.throws(
-      () => loadConfig(),
-      /GROKCHAIN_PROGRAM_ID is required|local-only/,
-    );
-
-    process.env.GROKCHAIN_PROGRAM_ID = LOCAL_ONLY_PROGRAM_ID;
-    assert.throws(() => loadConfig(), /local-only CORE program id on a non-localnet/);
-
-    process.env.GROKCHAIN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
-    assert.throws(
-      () => loadConfig(),
-      /GROKCHAIN_INTENTS_PROGRAM_ID is required|local-only/,
-    );
-
-    process.env.GROKCHAIN_INTENTS_PROGRAM_ID = LOCAL_ONLY_INTENTS_PROGRAM_ID;
-    assert.throws(() => loadConfig(), /local-only INTENTS program id on a non-localnet/);
   } finally {
-    if (prevCluster === undefined) delete process.env.GROKCHAIN_CLUSTER;
-    else process.env.GROKCHAIN_CLUSTER = prevCluster;
-    if (prevProgram === undefined) delete process.env.GROKCHAIN_PROGRAM_ID;
-    else process.env.GROKCHAIN_PROGRAM_ID = prevProgram;
-    if (prevIntents === undefined) delete process.env.GROKCHAIN_INTENTS_PROGRAM_ID;
-    else process.env.GROKCHAIN_INTENTS_PROGRAM_ID = prevIntents;
+    restoreEnv(snap);
+  }
+});
+
+test("cluster=devnet with no ids throws waiting / required", () => {
+  const snap = snapshotEnv();
+  try {
+    clearIds();
+    process.env.GROKCHAIN_CLUSTER = "devnet";
+    assert.throws(() => loadConfig(), /waiting|required/i);
+  } finally {
+    restoreEnv(snap);
+  }
+});
+
+test("cluster=devnet + CORE local-only id is refused (8WDh...)", () => {
+  const snap = snapshotEnv();
+  try {
+    clearIds();
+    process.env.GROKCHAIN_CLUSTER = "devnet";
+    process.env.GROKCHAIN_PROGRAM_ID = LOCAL_ONLY_PROGRAM_ID;
+    process.env.GROKCHAIN_INTENTS_PROGRAM_ID = FIXTURE_INTENTS;
+    assert.throws(
+      () => loadConfig(),
+      (err: unknown) => {
+        assert.ok(err instanceof Error);
+        assert.match(err.message, /8WDhHSfrz6hMkmX7WteAAmyuWFLryHM2Kfc1r4k8EFXE/);
+        assert.match(err.message, /local-only/);
+        assert.match(err.message, /not a deployed program/);
+        assert.match(err.message, /not valid on devnet/);
+        return true;
+      },
+    );
+  } finally {
+    restoreEnv(snap);
+  }
+});
+
+test("cluster=devnet + INTENTS local-only id is refused (AXprc...)", () => {
+  const snap = snapshotEnv();
+  try {
+    clearIds();
+    process.env.GROKCHAIN_CLUSTER = "devnet";
+    process.env.GROKCHAIN_PROGRAM_ID = FIXTURE_CORE;
+    process.env.GROKCHAIN_INTENTS_PROGRAM_ID = LOCAL_ONLY_INTENTS_PROGRAM_ID;
+    assert.throws(
+      () => loadConfig(),
+      (err: unknown) => {
+        assert.ok(err instanceof Error);
+        assert.match(err.message, /AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2/);
+        assert.match(err.message, /local-only/);
+        assert.match(err.message, /not a deployed program/);
+        assert.match(err.message, /not valid on devnet/);
+        return true;
+      },
+    );
+  } finally {
+    restoreEnv(snap);
+  }
+});
+
+test("cluster=devnet + swapping local-only ids is refused", () => {
+  const snap = snapshotEnv();
+  try {
+    clearIds();
+    process.env.GROKCHAIN_CLUSTER = "devnet";
+    process.env.GROKCHAIN_PROGRAM_ID = LOCAL_ONLY_INTENTS_PROGRAM_ID;
+    process.env.GROKCHAIN_INTENTS_PROGRAM_ID = FIXTURE_INTENTS;
+    assert.throws(
+      () => loadConfig(),
+      (err: unknown) => {
+        assert.ok(err instanceof Error);
+        assert.match(err.message, /AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2/);
+        assert.match(err.message, /local-only/);
+        return true;
+      },
+    );
+
+    process.env.GROKCHAIN_PROGRAM_ID = FIXTURE_CORE;
+    process.env.GROKCHAIN_INTENTS_PROGRAM_ID = LOCAL_ONLY_PROGRAM_ID;
+    assert.throws(
+      () => loadConfig(),
+      (err: unknown) => {
+        assert.ok(err instanceof Error);
+        assert.match(err.message, /8WDhHSfrz6hMkmX7WteAAmyuWFLryHM2Kfc1r4k8EFXE/);
+        assert.match(err.message, /local-only/);
+        return true;
+      },
+    );
+  } finally {
+    restoreEnv(snap);
+  }
+});
+
+test("cluster=devnet + two valid fixture pubkeys that are not banned succeeds", () => {
+  const snap = snapshotEnv();
+  try {
+    clearIds();
+    process.env.GROKCHAIN_CLUSTER = "devnet";
+    process.env.GROKCHAIN_PROGRAM_ID = FIXTURE_CORE;
+    process.env.GROKCHAIN_INTENTS_PROGRAM_ID = FIXTURE_INTENTS;
+    const cfg = loadConfig();
+    assert.equal(cfg.cluster, "devnet");
+    assert.equal(cfg.programId.toBase58(), FIXTURE_CORE);
+    assert.equal(cfg.intentsProgramId.toBase58(), FIXTURE_INTENTS);
+    assert.equal(cfg.localOnlyProgram, false);
+    assert.equal(cfg.localOnlyIntents, false);
+    const notes = clusterNotes(cfg).join("\n");
+    assert.match(notes, /grokchain-devnet config \/ env/);
+    assert.match(notes, /treated as deployed/);
+    assert.match(notes, /no seed export/i);
+    assert.match(notes, /Relayer is the only address reimbursed/);
+  } finally {
+    restoreEnv(snap);
+  }
+});
+
+test("loading config/devnet.json as-is (null ids) throws waiting", () => {
+  const snap = snapshotEnv();
+  try {
+    clearIds();
+    process.env.GROKCHAIN_CONFIG = REPO_DEVNET_JSON;
+    assert.throws(() => loadConfig(), /waiting|required/i);
+  } finally {
+    restoreEnv(snap);
+  }
+});
+
+test("a temp json with a banned id is refused", () => {
+  const snap = snapshotEnv();
+  try {
+    clearIds();
+    const p = writeTempConfig({
+      cluster: "devnet",
+      rpcUrl: "https://api.devnet.solana.com",
+      coreProgramId: LOCAL_ONLY_PROGRAM_ID,
+      intentsProgramId: FIXTURE_INTENTS,
+    });
+    process.env.GROKCHAIN_CONFIG = p;
+    assert.throws(
+      () => loadConfig(),
+      (err: unknown) => {
+        assert.ok(err instanceof Error);
+        assert.match(err.message, /8WDhHSfrz6hMkmX7WteAAmyuWFLryHM2Kfc1r4k8EFXE/);
+        assert.match(err.message, /local-only/);
+        assert.match(err.message, /not valid on devnet/);
+        return true;
+      },
+    );
+  } finally {
+    restoreEnv(snap);
+  }
+});
+
+test("a temp json with two fixture ids is accepted", () => {
+  const snap = snapshotEnv();
+  try {
+    clearIds();
+    const p = writeTempConfig({
+      cluster: "devnet",
+      rpcUrl: "https://api.devnet.solana.com",
+      coreProgramId: FIXTURE_CORE,
+      intentsProgramId: FIXTURE_INTENTS,
+    });
+    process.env.GROKCHAIN_CONFIG = p;
+    const cfg = loadConfig();
+    assert.equal(cfg.cluster, "devnet");
+    assert.equal(cfg.rpcUrl, "https://api.devnet.solana.com");
+    assert.equal(cfg.programId.toBase58(), FIXTURE_CORE);
+    assert.equal(cfg.intentsProgramId.toBase58(), FIXTURE_INTENTS);
+    assert.equal(cfg.localOnlyProgram, false);
+    assert.equal(cfg.localOnlyIntents, false);
+  } finally {
+    restoreEnv(snap);
   }
 });

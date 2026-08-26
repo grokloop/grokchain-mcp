@@ -34,7 +34,9 @@ export GROKCHAIN_CLUSTER=localnet
 export GROKCHAIN_RPC_URL=http://127.0.0.1:8899
 # GROKCHAIN_PROGRAM_ID is optional on localnet (defaults to the local-only CORE id).
 # GROKCHAIN_INTENTS_PROGRAM_ID is optional on localnet (defaults to the local-only INTENTS id).
-# Both are required on any other cluster — and neither program is deployed there today.
+# Both are required on any other cluster. On devnet, use config/devnet.json (empty slot until CORE + PROGRAMS send real ids).
+# Local-only ids are refused on devnet. Neither program is deployed there today.
+# export GROKCHAIN_CONFIG="$PWD/config/devnet.json"
 export GROKCHAIN_ROOT_KEYPAIR="$HOME/.config/solana/id.json"
 export GROKCHAIN_AGENT_KEYPAIR="$HOME/.config/grokchain/agent.json"
 export GROKCHAIN_RELAYER_KEYPAIR="$HOME/.config/grokchain/relayer.json"
@@ -45,6 +47,15 @@ Start a local validator that is actually running **both** the local-only CORE pr
 Local-only CORE id (not deployed, not devnet, not mainnet): `8WDhHSfrz6hMkmX7WteAAmyuWFLryHM2Kfc1r4k8EFXE`
 
 Local-only INTENTS id (not deployed, not devnet, not mainnet): `AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2`
+
+
+## Devnet
+
+`GROKCHAIN_CLUSTER=devnet` plus `config/devnet.json`, or `GROKCHAIN_CONFIG=/path/to/config/devnet.json`, or `grokchain --config config/devnet.json`. Env `GROKCHAIN_PROGRAM_ID` / `GROKCHAIN_INTENTS_PROGRAM_ID` override file values if set.
+
+Real deployed program ids only. Fill `config/devnet.json` ONLY with real ids from CORE / PROGRAMS. Never the two local-only ids above. Those are refused — they are local-only, not a deployed program, not valid on devnet. `null` means not deployed yet. The slot is empty until CORE and PROGRAMS send ids. Do not invent ids.
+
+The grokchain-devnet path will not start without those ids. Relayer still fee-pays. Human still funds vaults.
 
 ## 3. Create the Grok Account (you sign).
 

@@ -32,11 +32,17 @@ function usage(): string {
 Env (paths, never secrets):
   GROKCHAIN_CLUSTER                 localnet|devnet|mainnet-beta (default localnet)
   GROKCHAIN_RPC_URL
+  GROKCHAIN_CONFIG                  path to JSON config (e.g. config/devnet.json)
   GROKCHAIN_PROGRAM_ID              CORE id; required except localnet
   GROKCHAIN_INTENTS_PROGRAM_ID      INTENTS id; required except localnet
   GROKCHAIN_ROOT_KEYPAIR            path to human wallet (Solana CLI JSON)
   GROKCHAIN_AGENT_KEYPAIR           path to agent keystore (0600)
   GROKCHAIN_RELAYER_KEYPAIR         path to relayer keystore (0600)
+
+  grokchain --config config/devnet.json <command>
+  Devnet accepts REAL deployed program ids only. The grokchain-devnet slot
+  (config/devnet.json) is empty until CORE and PROGRAMS send them.
+  Local-only ids are refused on devnet. Relayer remains fee payer.
 
 Commands:
   grokchain root create-account
@@ -139,6 +145,12 @@ async function status(flags: Flags): Promise<void> {
 
 async function main(): Promise<void> {
   const { cmd, flags } = parseArgs(process.argv.slice(2));
+  if (flags.config === true) {
+    throw new Error("missing --config <path> (e.g. config/devnet.json)");
+  }
+  if (typeof flags.config === "string") {
+    process.env.GROKCHAIN_CONFIG = flags.config;
+  }
   if (flags.help || cmd.length === 0) {
     process.stdout.write(usage());
     process.exit(0);

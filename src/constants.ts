@@ -2,15 +2,27 @@
  * CORE + INTENTS wire constants.
  *
  * LOCAL-ONLY program ids are defaults ONLY when cluster=localnet.
- * Neither CORE nor INTENTS is deployed. Not on devnet. Not on mainnet.
+ * They are not a deployed program. Not on devnet. Not on mainnet.
  * Do not advertise these ids as live.
+ *
+ * DEVNET program ids are the grokchain-devnet deployed programs.
+ * Used ONLY when cluster=devnet (via config/devnet.json / explicit default).
+ * Never use them on localnet. Never use the local-only pair on devnet.
  */
 export const LOCAL_ONLY_PROGRAM_ID =
   "8WDhHSfrz6hMkmX7WteAAmyuWFLryHM2Kfc1r4k8EFXE";
 
-/** INTENTS crate grok_chain_intents. LOCAL-ONLY. Not deployed. */
+/** INTENTS crate grok_chain_intents. LOCAL-ONLY. Not deployed. Not on devnet. */
 export const LOCAL_ONLY_INTENTS_PROGRAM_ID =
   "AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2";
+
+/** grokchain-devnet deployed CORE. Used only when cluster=devnet. */
+export const DEVNET_CORE_PROGRAM_ID =
+  "7UtafKBBWNHEXC9PaNXu8USdZqL6VEWupsL7rS6LeVDj";
+
+/** grokchain-devnet deployed INTENTS (devnet router). Used only when cluster=devnet. */
+export const DEVNET_INTENTS_PROGRAM_ID =
+  "EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz";
 
 export const SEED_GROK_ACCOUNT = Buffer.from("grok-account");
 export const SEED_GRANT = Buffer.from("grant");

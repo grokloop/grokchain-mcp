@@ -15,7 +15,7 @@ function stub(intent: "swap" | "deploy" | "call", args: Record<string, unknown>)
     human: HUMAN_MD,
     notes: [
       "swap / deploy / call are stubs (IntentStub).",
-      "pay is the implemented INTENTS client (local-only intents id).",
+      "pay is the implemented INTENTS client (local-only on localnet; grokchain-devnet INTENTS id on devnet).",
       "Bot never holds SOL. Relayer is the fee payer.",
     ],
   };

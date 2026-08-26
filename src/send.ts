@@ -125,7 +125,9 @@ export async function dispatchIx(opts: DispatchOpts): Promise<ToolResult> {
       error: e instanceof Error ? e.message : String(e),
       unsigned_tx_base64: serializeUnsigned(tx),
       reason:
-        "Send failed. Local-only programs land only on a local validator running the matching CORE and INTENTS program ids. See HUMAN.md.",
+        cfg.cluster === "localnet"
+          ? "Send failed. Local-only programs land only on a local validator running the matching CORE and INTENTS program ids. See HUMAN.md."
+          : "Send failed. On this cluster the instruction lands only if the human has rooted the account, issued a grant allowlisting the deployed INTENTS id, funded SpendVault + Paymaster, and set RELAYER_KEYPAIR. Otherwise need_human_signature / need_human_setup. See HUMAN.md.",
       notes,
     };
   }

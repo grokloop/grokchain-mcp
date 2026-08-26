@@ -1,4 +1,9 @@
-import { HUMAN_MD } from "../constants.js";
+import {
+  DEVNET_INTENTS_PROGRAM_ID,
+  HUMAN_MD,
+  LOCAL_ONLY_INTENTS_PROGRAM_ID,
+  LOCAL_ONLY_PROGRAM_ID,
+} from "../constants.js";
 import { buildPayIx } from "../intents.js";
 import { parsePubkey } from "../keys.js";
 import { toBigInt, validatePay } from "../policy.js";
@@ -9,12 +14,31 @@ import {
   resolveRootPubkey,
 } from "../resolve.js";
 import { dispatchIx, needHumanSetup } from "../send.js";
+import type { AppConfig } from "../config.js";
 import type { ToolResult } from "../types.js";
+
+const BANNED_LOCAL_ONLY_IDS = new Set([
+  LOCAL_ONLY_PROGRAM_ID,
+  LOCAL_ONLY_INTENTS_PROGRAM_ID,
+]);
+
+/** Refuse banned local-only ids on every non-localnet cluster. */
+function refuseBannedIntentsOnPublicCluster(cfg: AppConfig): void {
+  if (cfg.cluster === "localnet") return;
+  const id = cfg.intentsProgramId.toBase58();
+  if (BANNED_LOCAL_ONLY_IDS.has(id)) {
+    throw new Error(
+      `Refusing INTENTS program id ${id}: it is local-only, not a deployed program, not valid on ${cfg.cluster}.`,
+    );
+  }
+}
 
 /**
  * Implemented INTENTS `pay` client.
  * Agent signs. Relayer is the ONLY outer fee payer. Bot never holds SOL.
  * Never sends a system transfer disguised as pay.
+ * On localnet: local-only INTENTS id. On devnet: grokchain-devnet INTENTS id.
+ * Missing keystores / vaults / grant still return need_human_*. Do not fake a send.
  */
 export async function payTool(args: {
   to: string;
@@ -25,6 +49,7 @@ export async function payTool(args: {
 }): Promise<ToolResult> {
   try {
     const ctx = openCtx(args);
+    refuseBannedIntentsOnPublicCluster(ctx.cfg);
     const recipient = parsePubkey(args.to, "to");
     const amount = toBigInt(args.amount_lamports, "amount_lamports");
     const sponsor = toBigInt(args.sponsor_lamports ?? 0, "sponsor_lamports");
@@ -83,6 +108,9 @@ export async function payTool(args: {
         ...warnings,
         "This is the INTENTS pay instruction, not a system transfer.",
         "Relayer is the outer fee payer. Bot never holds SOL.",
+        ctx.cfg.cluster === "devnet"
+          ? `pay builds against the grokchain-devnet INTENTS program ${ctx.cfg.intentsProgramId.toBase58() === DEVNET_INTENTS_PROGRAM_ID ? DEVNET_INTENTS_PROGRAM_ID : ctx.cfg.intentsProgramId.toBase58()}. Lands only if the human has rooted the account, issued a grant allowlisting the devnet INTENTS id, funded SpendVault + Paymaster, and set GROKCHAIN_RELAYER_KEYPAIR. Otherwise need_human_signature / need_human_setup. Do not fake a send.`
+          : "On localnet, pay builds against the local-only INTENTS id. Lands only if both local programs are running and vaults/grant/relayer are set up.",
       ],
     };
 

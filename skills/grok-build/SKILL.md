@@ -14,23 +14,33 @@ Use these names. Do not drop to raw Solana unless the human asked you to debug.
 | Intent | Who signs | What it is |
 | --- | --- | --- |
 | `create_account` | human root | Open the GrokAccount PDA |
-| `issue_grant` | human root | Authorize an agent pubkey. Router-mode allowlist = local-only INTENTS id. |
+| `issue_grant` | human root | Authorize an agent pubkey. Router-mode allowlist = INTENTS id for this cluster (local-only on localnet; `EYhYtq…` on devnet). |
 | `revise_grant` | human root | Replace policy on that grant |
 | `revoke_grant` | human root | Mark the grant revoked |
 | `check_grant` | agent | Consume path. Increments `spent_lamports`. Does not move SOL. |
-| `pay` | agent signs; relayer fee-pays | **Implemented** INTENTS client (local-only). Human-funded SpendVault → recipient. Bot never holds SOL. |
+| `pay` | agent signs; relayer fee-pays | **Implemented** INTENTS client. localnet: local-only INTENTS id. **devnet**: grokchain-devnet INTENTS id. Human-funded SpendVault → recipient. Bot never holds SOL. |
 | `swap` / `deploy` / `call` | — | **Stub** (`IntentStub`). Do not pretend to DEX or deploy. |
 | `get_account` / `get_grant` | none | Optional reads |
 
-## CORE + INTENTS are local-only today
+## CORE + INTENTS by cluster
 
-CORE is not deployed. INTENTS is not deployed. Not on a public cluster. There is no live program id to invent.
-
-- If `GROKCHAIN_CLUSTER` is not `localnet`, or the local programs are not running, say so.
+- **localnet**: CORE `8WDhHSfrz6hMkmX7WteAAmyuWFLryHM2Kfc1r4k8EFXE` and INTENTS `AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2`. Local-only. Not a deployed program. Not on devnet. Not on mainnet. Never present them as a shipped deployment.
+- **devnet**: CORE `7UtafKBBWNHEXC9PaNXu8USdZqL6VEWupsL7rS6LeVDj` and INTENTS `EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz` are the grokchain-devnet deployed programs.
+  - CORE explorer: https://explorer.solana.com/address/7UtafKBBWNHEXC9PaNXu8USdZqL6VEWupsL7rS6LeVDj?cluster=devnet
+  - INTENTS explorer: https://explorer.solana.com/address/EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz?cluster=devnet
 - Do not invent a program id.
-- The local-only CORE default id is used **only** when cluster is `localnet`. Never present it as a shipped deployment.
-- The local-only INTENTS default id is used **only** when cluster is `localnet`. Never present it as a shipped deployment.
-- `pay` is real against the local INTENTS program. It lands only if both local programs are running.
+- Never use the local-only pair on devnet. Config refuses them.
+
+On **devnet**, `create_account` / `issue_grant` / `revise_grant` / `revoke_grant` / `check_grant` and `pay` / vaults are implemented clients against the real deployed ids. They land only if the human has rooted the account, issued a grant allowlisting the **devnet INTENTS** id `EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz`, funded SpendVault + Paymaster, and set `GROKCHAIN_RELAYER_KEYPAIR`. Otherwise `need_human_signature` / `need_human_setup`. Do not fake a send.
+
+`swap` / `deploy` / `call` still stub.
+
+## Devnet
+
+`GROKCHAIN_CLUSTER=devnet` plus `config/devnet.json` or `GROKCHAIN_CONFIG` or `grokchain --config config/devnet.json`. Env can override. The two local-only ids are refused. Relayer still fee-pays. Human still funds vaults.
+
+Grant allowlist on devnet must use `EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz` (the devnet router), not the local-only `AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2`.
+
 
 ## Never ask for keys. Never hold SOL.
 
@@ -44,6 +54,7 @@ Env vars name **paths**, not secrets:
 
 - `GROKCHAIN_CLUSTER` (`localnet` default)
 - `GROKCHAIN_RPC_URL`
+- `GROKCHAIN_CONFIG` (path to JSON, e.g. config/devnet.json)
 - `GROKCHAIN_PROGRAM_ID` (CORE; required except localnet)
 - `GROKCHAIN_INTENTS_PROGRAM_ID` (INTENTS; required except localnet)
 - `GROKCHAIN_ROOT_KEYPAIR` (path)
@@ -62,7 +73,7 @@ Env vars name **paths**, not secrets:
 
 - `expires_at_unix` is required and must be in the future. `0` is rejected.
 - `allowed_programs` length ≤ 8, no duplicates. Empty allowlist means `check_grant` is denied.
-- v1 allowlist is **router mode**: the human allowlists the local-only INTENTS program id, not every inner DEX and not SystemProgram.
+- v1 allowlist is **router mode**: the human allowlists the INTENTS program id for this cluster, not every inner DEX and not SystemProgram. localnet = local-only `AXprc…`. **devnet** = `EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz` (the devnet router).
 - `spend_cap_lamports` of `0` is call-only (`check_grant` amount must be `0`).
 - Cap is a counter, not a vault. CORE does not hold spendable SOL. INTENTS SpendVault does.
 
@@ -82,7 +93,7 @@ When you describe a grant or an approval, show:
 
 - agent pubkey (short + copy)
 - cap in SOL (and remaining = cap − spent)
-- allowlist program ids (router = local-only INTENTS id)
+- allowlist program ids (router = INTENTS id for this cluster; on devnet that is `EYhYtq…`)
 - expiry in **their local timezone**
 - label as **untrusted text**
 - spend vault balance (lamports minus rent)

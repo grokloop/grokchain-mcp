@@ -1,7 +1,7 @@
 {
   "name": "@grokchain/mcp",
   "version": "0.1.0",
-  "description": "Official Grok Chain MCP. Agents talk intents, never hold keys. CORE and INTENTS are local-only today. Bot never holds SOL.",
+  "description": "Official Grok Chain MCP. Agents talk intents, never hold keys. Localnet uses local-only program ids. Devnet uses the grokchain-devnet deployed CORE and INTENTS ids. Bot never holds SOL.",
   "type": "module",
   "license": "MIT",
   "bin": {
@@ -12,6 +12,7 @@
     "dist",
     "skills",
     "idl",
+    "config",
     "HUMAN.md",
     "README.md",
     "LICENSE"

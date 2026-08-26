@@ -2,13 +2,18 @@
 
 Official Grok Chain MCP and Grok Build skill. Agents talk intents. They never hold keys.
 
-CORE (identity / policy) is local-only today. It is not deployed. It is not on
-devnet. It is not on mainnet. There is no live program id. The local validator
-id is a default only when GROKCHAIN_CLUSTER=localnet.
+On **localnet**, CORE and INTENTS default to the local-only validator pair
+(`8WDhHSfrz6hMkmX7WteAAmyuWFLryHM2Kfc1r4k8EFXE` and
+`AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2`). Those ids are local-only.
+They are not a deployed program. They are not on devnet. They are not on
+mainnet. Do not treat them as live.
 
-INTENTS (pay + paymaster) is local-only today. It is not deployed. It is not on
-devnet. It is not on mainnet. The local validator intents id is a default only
-when GROKCHAIN_CLUSTER=localnet.
+On **devnet**, CORE and INTENTS are the grokchain-devnet deployed programs:
+
+- CORE: `7UtafKBBWNHEXC9PaNXu8USdZqL6VEWupsL7rS6LeVDj`
+  https://explorer.solana.com/address/7UtafKBBWNHEXC9PaNXu8USdZqL6VEWupsL7rS6LeVDj?cluster=devnet
+- INTENTS: `EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz`
+  https://explorer.solana.com/address/EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz?cluster=devnet
 
 Human funds SpendVault (pay source) AND Paymaster (gas). Two deposits. Human
 pays. The relayer is the only address reimbursed as the outer fee payer. The
@@ -21,20 +26,48 @@ Chain pays.
 
 | Tool | Today |
 | --- | --- |
-| create_account | implemented CORE client (local-only, lands only on local validator + key path) |
-| issue_grant | implemented CORE client (local-only, lands only on local validator + key path) |
-| revise_grant | implemented CORE client (local-only, lands only on local validator + key path) |
-| revoke_grant | implemented CORE client (local-only, lands only on local validator + key path) |
-| check_grant | implemented CORE client (local-only, lands only on local validator + key path) |
-| pay | implemented INTENTS client (local-only intents id). Relayer fee-pays. Human-funded vaults. Lands only if both local programs are running. |
+| create_account | implemented CORE client. **devnet**: real grokchain-devnet CORE id. localnet: local-only CORE id. Lands only if the human has rooted the account (`GROKCHAIN_ROOT_KEYPAIR`). Otherwise need_human_signature / need_human_setup. |
+| issue_grant | implemented CORE client. Same cluster split. Grant allowlist on **devnet** must be the real INTENTS id `EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz` (the devnet router), not the local-only `AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2`. |
+| revise_grant | implemented CORE client. Same cluster split. |
+| revoke_grant | implemented CORE client. Same cluster split. |
+| check_grant | implemented CORE client. Same cluster split. |
+| pay | implemented INTENTS client. **devnet**: real grokchain-devnet INTENTS id. localnet: local-only INTENTS id. Relayer fee-pays. Human-funded vaults. Lands only if the human has rooted the account, issued a grant allowlisting the cluster INTENTS id, funded SpendVault + Paymaster, and set RELAYER_KEYPAIR. Otherwise need_human_signature / need_human_setup. Do not fake a send. |
+| vault / paymaster CLI | implemented INTENTS client (same ids as pay). Root-signed. Human funds. |
 | swap / deploy / call | stub (IntentStub) |
-| No public-cluster deployment | Neither CORE nor INTENTS is live. |
 
 Optional read-only: get_account, get_grant.
 
-pay is implemented against the local-only INTENTS program. It does not send a
-system transfer. Agent signs. Relayer is the fee payer. Human-funded SpendVault
-is the SOL source. Optional sponsor reimburses the relayer from YOUR paymaster.
+pay is implemented against INTENTS. It does not send a system transfer. Agent
+signs. Relayer is the fee payer. Human-funded SpendVault is the SOL source.
+Optional sponsor reimburses the relayer from YOUR paymaster.
+
+## Devnet
+
+`GROKCHAIN_CLUSTER=devnet` plus `config/devnet.json`, or `GROKCHAIN_CONFIG`, or
+`grokchain --config config/devnet.json`. Env `GROKCHAIN_PROGRAM_ID` /
+`GROKCHAIN_INTENTS_PROGRAM_ID` override file values if set.
+
+Real grokchain-devnet deployed program ids:
+
+- CORE: `7UtafKBBWNHEXC9PaNXu8USdZqL6VEWupsL7rS6LeVDj`
+  Explorer: https://explorer.solana.com/address/7UtafKBBWNHEXC9PaNXu8USdZqL6VEWupsL7rS6LeVDj?cluster=devnet
+- INTENTS: `EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz`
+  Explorer: https://explorer.solana.com/address/EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz?cluster=devnet
+
+Never use the two local-only ids
+(`8WDhHSfrz6hMkmX7WteAAmyuWFLryHM2Kfc1r4k8EFXE` and
+`AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2`) on devnet. Those are refused —
+they are local-only, not a deployed program, not valid on devnet. They remain
+the localnet defaults only.
+
+Relayer still fee-pays. Human still funds vaults.
+
+On **devnet**, create/issue/revise/revoke/check_grant and pay/vaults are
+implemented clients against the real deployed ids. They land only if the human
+has rooted the account, issued a grant allowlisting the **devnet INTENTS** id
+`EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz`, funded SpendVault + Paymaster,
+and set RELAYER_KEYPAIR. Otherwise need_human_signature / need_human_setup.
+swap/deploy/call still stub.
 
 ## Install and run
 
@@ -43,6 +76,8 @@ Node 20+.
 
 GROKCHAIN_CLUSTER: localnet (default), devnet, or mainnet-beta
 GROKCHAIN_RPC_URL: RPC URL (default follows cluster)
+GROKCHAIN_CONFIG: path to JSON config (e.g. config/devnet.json)
+
 GROKCHAIN_PROGRAM_ID: CORE id; required except localnet
 GROKCHAIN_INTENTS_PROGRAM_ID: INTENTS id; required except localnet
 GROKCHAIN_ROOT_KEYPAIR: path to the human wallet file
@@ -55,7 +90,7 @@ Never ask the bot for a key.
 ## Cursor MCP config (stdio)
 
 Use command npx with arg grokchain-mcp over stdio.
-Set GROKCHAIN_CLUSTER to localnet, GROKCHAIN_RPC_URL to the local validator,
+Set GROKCHAIN_CLUSTER to localnet or devnet, GROKCHAIN_RPC_URL to match,
 GROKCHAIN_ROOT_KEYPAIR to the absolute path of the human wallet file,
 GROKCHAIN_AGENT_KEYPAIR to the absolute path of the agent keystore, and
 GROKCHAIN_RELAYER_KEYPAIR to the absolute path of the relayer keystore.
@@ -74,7 +109,7 @@ See HUMAN.md.
     grokchain root create-account
     grokchain agent init
     grokchain relayer init
-    grokchain root issue-grant --agent PK --cap LAMPORTS --expires UNIX --programs LOCAL_INTENTS_ID [--sponsor]
+    grokchain root issue-grant --agent PK --cap LAMPORTS --expires UNIX --programs INTENTS_ID [--sponsor]
     grokchain vault init-spend
     grokchain vault fund-spend --sol 0.05
     grokchain paymaster init --relayer PK
@@ -83,13 +118,19 @@ See HUMAN.md.
     grokchain root revoke-grant --agent PK
     grokchain status
 
+On localnet, `--programs` is the local-only INTENTS id
+`AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2` (not live). On **devnet**,
+`--programs` is the real INTENTS id
+`EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz` (the devnet router).
+
 `grokchain fund --to agent` is removed (old wrong path). The bot never holds
 SOL. Human funds SpendVault and Paymaster. Relayer submits.
 
 ## Grok Build skill
 
 skills/grok-build/SKILL.md teaches a bot to use the tool names, refuse keys,
-treat CORE and INTENTS as local-only, and never hold SOL.
+use the local-only pair only on localnet, use the grokchain-devnet ids on
+devnet, and never hold SOL.
 
 ## License
 

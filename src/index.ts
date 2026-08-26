@@ -26,7 +26,7 @@ function buildServer(): McpServer {
 
   server.tool(
     "create_account",
-    "Create the GrokAccount PDA for the human root. Root-signed. CORE is local-only today — not a live deployment. If the root keypair path is missing, returns need_human_signature / need_human_setup and an unsigned tx. Never ask for a seed or key.",
+    "Create the GrokAccount PDA for the human root. Root-signed. On localnet uses the local-only CORE id. On devnet uses the grokchain-devnet CORE program. If the root keypair path is missing, returns need_human_signature / need_human_setup and an unsigned tx. Never ask for a seed or key.",
     {
       dry_run: z.boolean().optional().describe("Simulate instead of sending"),
       root: pubkey.optional().describe("Root pubkey if GROKCHAIN_ROOT_KEYPAIR is unset (unsigned-tx path)"),
@@ -36,13 +36,13 @@ function buildServer(): McpServer {
 
   server.tool(
     "issue_grant",
-    "Issue a capability Grant PDA to an agent pubkey. Root signs. Agent does not sign issue. expires_at_unix required and must be in the future. allowed_programs max 8, no duplicates, empty deny-all. cap 0 = call-only. v1 allowlist is router mode (allowlist the local-only INTENTS program id). sponsor_eligible means this grant may use YOUR paymaster — not a promise Grok Chain pays.",
+    "Issue a capability Grant PDA to an agent pubkey. Root signs. Agent does not sign issue. expires_at_unix required and must be in the future. allowed_programs max 8, no duplicates, empty deny-all. cap 0 = call-only. v1 allowlist is router mode: localnet allowlists the local-only INTENTS id; devnet allowlists the grokchain-devnet INTENTS id (EYhYtq…). sponsor_eligible means this grant may use YOUR paymaster — not a promise Grok Chain pays.",
     {
       agent: pubkey.describe("Agent identity pubkey (public, not a secret)"),
       spend_cap_lamports: lamports.describe("Spend cap counter in lamports. 0 = call-only. Not a vault."),
       allowed_programs: z
         .array(pubkey)
-        .describe("Program allowlist, max 8. Empty means check_grant is denied. Router mode: allowlist the local-only INTENTS program id, not every inner DEX."),
+        .describe("Program allowlist, max 8. Empty means check_grant is denied. Router mode: localnet allowlists the local-only INTENTS id; devnet allowlists the grokchain-devnet INTENTS id (EYhYtq…), not every inner DEX."),
       expires_at_unix: z
         .union([z.number().int(), z.string()])
         .describe("Required unix expiry. 0 is rejected."),
@@ -89,7 +89,7 @@ function buildServer(): McpServer {
     "Agent consume path. Agent signs. Increments spent_lamports. Does not move SOL. Empty allowlist is denied. cap 0 requires amount 0. Optional root if not in config. Relayer submits if you also call pay.",
     {
       amount_lamports: lamports.describe("Amount to consume from the cap counter. 0 is valid (call-only)."),
-      target_program: pubkey.describe("Target program id (v1 router mode: the local-only INTENTS program id)."),
+      target_program: pubkey.describe("Target program id (v1 router mode: local-only INTENTS on localnet; grokchain-devnet INTENTS EYhYtq… on devnet)."),
       root: pubkey.optional().describe("Root pubkey if GROKCHAIN_ROOT_KEYPAIR is unset"),
       agent: pubkey.optional().describe("Agent pubkey if GROKCHAIN_AGENT_KEYPAIR is unset (unsigned-tx path)"),
       dry_run: z.boolean().optional(),
@@ -99,7 +99,7 @@ function buildServer(): McpServer {
 
   server.tool(
     "pay",
-    "Implemented INTENTS pay (local-only intents id). Agent signs. Relayer is the outer fee payer. Bot never holds SOL. Human-funded SpendVault is the SOL source. Optional sponsor reimburses the relayer from YOUR paymaster. Lands only if both local CORE and INTENTS programs are running.",
+    "Implemented INTENTS pay. On localnet uses the local-only intents id. On devnet builds against the grokchain-devnet INTENTS program. Agent signs. Relayer is the outer fee payer. Bot never holds SOL. Human-funded SpendVault is the SOL source. Optional sponsor reimburses the relayer from YOUR paymaster. Lands only if the human has rooted the account, issued a grant allowlisting the INTENTS id, funded SpendVault + Paymaster, and set RELAYER_KEYPAIR. Otherwise need_human_signature / need_human_setup.",
     {
       to: pubkey.describe("Recipient pubkey"),
       amount_lamports: z

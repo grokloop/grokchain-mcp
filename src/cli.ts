@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { LOCAL_ONLY_INTENTS_PROGRAM_ID } from "./constants.js";
+import { DEVNET_INTENTS_PROGRAM_ID, LOCAL_ONLY_INTENTS_PROGRAM_ID } from "./constants.js";
 import {
   defaultAgentPath,
   defaultRelayerPath,
@@ -27,23 +27,30 @@ import {
 } from "./tools/vaults.js";
 
 function usage(): string {
-  return `grokchain — human CLI for Grok Chain CORE + INTENTS (local-only today)
+  return `grokchain — human CLI for Grok Chain CORE + INTENTS
 
 Env (paths, never secrets):
   GROKCHAIN_CLUSTER                 localnet|devnet|mainnet-beta (default localnet)
   GROKCHAIN_RPC_URL
+  GROKCHAIN_CONFIG                  path to JSON config (e.g. config/devnet.json)
   GROKCHAIN_PROGRAM_ID              CORE id; required except localnet
   GROKCHAIN_INTENTS_PROGRAM_ID      INTENTS id; required except localnet
   GROKCHAIN_ROOT_KEYPAIR            path to human wallet (Solana CLI JSON)
   GROKCHAIN_AGENT_KEYPAIR           path to agent keystore (0600)
   GROKCHAIN_RELAYER_KEYPAIR         path to relayer keystore (0600)
 
+  grokchain --config config/devnet.json <command>
+  Devnet wires the grokchain-devnet deployed CORE and INTENTS ids from
+  config/devnet.json. Local-only ids are refused on devnet. Relayer remains
+  fee payer. Human funds vaults. Bot never holds SOL.
+
 Commands:
   grokchain root create-account
   grokchain root issue-grant --agent <pk> --cap <lamports> --expires <unix> --programs <csv>
                              [--sponsor] [--label <text>]
-      --programs is router mode: allowlist the local-only INTENTS id
-      (${LOCAL_ONLY_INTENTS_PROGRAM_ID}), not SystemProgram.
+      --programs is router mode: allowlist the INTENTS id for this cluster.
+      localnet: ${LOCAL_ONLY_INTENTS_PROGRAM_ID} (local-only, not live).
+      devnet: ${DEVNET_INTENTS_PROGRAM_ID} (devnet router). Not SystemProgram.
       --sponsor means this grant may use YOUR paymaster — not a promise Grok Chain pays.
   grokchain root revise-grant --agent <pk> --cap <lamports> --expires <unix> --programs <csv>
                              [--sponsor] [--label <text>]
@@ -69,7 +76,8 @@ removed: grokchain fund --to agent (old wrong path).
 The bot/agent never holds SOL and is never the fee payer.
 Human funds SpendVault (pay source) and Paymaster (gas). Relayer submits.
 
-CORE and INTENTS are local-only today. Not deployed. See HUMAN.md.
+localnet uses the local-only CORE + INTENTS pair. Devnet uses the
+grokchain-devnet deployed ids. See HUMAN.md.
 `;
 }
 
@@ -139,6 +147,12 @@ async function status(flags: Flags): Promise<void> {
 
 async function main(): Promise<void> {
   const { cmd, flags } = parseArgs(process.argv.slice(2));
+  if (flags.config === true) {
+    throw new Error("missing --config <path> (e.g. config/devnet.json)");
+  }
+  if (typeof flags.config === "string") {
+    process.env.GROKCHAIN_CONFIG = flags.config;
+  }
   if (flags.help || cmd.length === 0) {
     process.stdout.write(usage());
     process.exit(0);

@@ -1,0 +1,69 @@
+import { PublicKey } from "@solana/web3.js";
+import { LABEL_LEN } from "./constants.js";
+
+export function encodeU64(n: bigint | number | string): Buffer {
+  const buf = Buffer.alloc(8);
+  buf.writeBigUInt64LE(BigInt(n));
+  return buf;
+}
+
+export function encodeI64(n: bigint | number | string): Buffer {
+  const buf = Buffer.alloc(8);
+  buf.writeBigInt64LE(BigInt(n));
+  return buf;
+}
+
+export function encodePubkeyVec(keys: PublicKey[]): Buffer {
+  const buf = Buffer.alloc(4 + 32 * keys.length);
+  buf.writeUInt32LE(keys.length, 0);
+  for (let i = 0; i < keys.length; i++) {
+    keys[i]!.toBuffer().copy(buf, 4 + i * 32);
+  }
+  return buf;
+}
+
+export function encodeLabel(label?: string): Buffer {
+  const out = Buffer.alloc(LABEL_LEN);
+  if (label) {
+    const b = Buffer.from(label, "utf8");
+    b.copy(out, 0, 0, Math.min(LABEL_LEN, b.length));
+  }
+  return out;
+}
+
+export function encodeBool(v: boolean): Buffer {
+  return Buffer.from([v ? 1 : 0]);
+}
+
+export type GrantPolicyArgs = {
+  spendCapLamports: bigint | number | string;
+  allowedPrograms: PublicKey[];
+  expiresAtUnix: number | string;
+  sponsorEligible: boolean;
+  label?: string;
+};
+
+/** Borsh GrantPolicyArgs: u64 + Vec<Pubkey> + i64 + bool + [u8;32] */
+export function encodeGrantPolicyArgs(args: GrantPolicyArgs): Buffer {
+  return Buffer.concat([
+    encodeU64(args.spendCapLamports),
+    encodePubkeyVec(args.allowedPrograms),
+    encodeI64(args.expiresAtUnix),
+    encodeBool(args.sponsorEligible),
+    encodeLabel(args.label),
+  ]);
+}
+
+export function encodeCheckGrantArgs(amountLamports: bigint | number | string): Buffer {
+  return encodeU64(amountLamports);
+}
+
+export function decodeLabel(bytes: Buffer): string {
+  const end = bytes.findIndex((b) => b === 0);
+  const slice = end === -1 ? bytes : bytes.subarray(0, end);
+  try {
+    return new TextDecoder("utf-8", { fatal: false }).decode(slice);
+  } catch {
+    return slice.toString("hex");
+  }
+}

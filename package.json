@@ -1,0 +1,47 @@
+{
+  "name": "@grokchain/mcp",
+  "version": "0.1.0",
+  "description": "Official Grok Chain MCP. Agents talk intents, never hold keys. CORE and INTENTS are local-only today. Bot never holds SOL.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "grokchain": "./dist/cli.js",
+    "grokchain-mcp": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "idl",
+    "HUMAN.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "tsx --test tests/*.test.ts",
+    "grokchain": "node dist/cli.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.0",
+    "@solana/web3.js": "^1.98.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/grokloop/grokchain-mcp.git"
+  },
+  "keywords": [
+    "grokchain",
+    "mcp",
+    "solana"
+  ]
+}

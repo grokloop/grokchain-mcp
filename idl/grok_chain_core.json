@@ -1,0 +1,238 @@
+{
+  "address": "8WDhHSfrz6hMkmX7WteAAmyuWFLryHM2Kfc1r4k8EFXE",
+  "metadata": {
+    "name": "grok_chain_core",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Grok Chain core identity/policy program (v1). Local-only program id. Not deployed."
+  },
+  "instructions": [
+    {
+      "name": "create_account",
+      "discriminator": [99, 20, 130, 119, 196, 235, 131, 149],
+      "accounts": [
+        { "name": "root", "writable": true, "signer": true },
+        { "name": "grok_account", "writable": true, "pda": { "seeds": [{ "kind": "const", "value": [103, 114, 111, 107, 45, 97, 99, 99, 111, 117, 110, 116] }, { "kind": "account", "path": "root" }] } },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": []
+    },
+    {
+      "name": "issue_grant",
+      "discriminator": [65, 190, 99, 75, 71, 70, 20, 107],
+      "accounts": [
+        { "name": "root", "writable": true, "signer": true },
+        { "name": "grok_account", "writable": true },
+        { "name": "agent" },
+        { "name": "grant", "writable": true },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": [
+        { "name": "args", "type": { "defined": { "name": "GrantPolicyArgs" } } }
+      ]
+    },
+    {
+      "name": "revise_grant",
+      "discriminator": [5, 225, 71, 127, 205, 246, 234, 59],
+      "accounts": [
+        { "name": "root", "signer": true },
+        { "name": "grok_account" },
+        { "name": "grant", "writable": true }
+      ],
+      "args": [
+        { "name": "args", "type": { "defined": { "name": "GrantPolicyArgs" } } }
+      ]
+    },
+    {
+      "name": "revoke_grant",
+      "discriminator": [134, 180, 57, 39, 152, 7, 154, 98],
+      "accounts": [
+        { "name": "root", "signer": true },
+        { "name": "grok_account" },
+        { "name": "grant", "writable": true }
+      ],
+      "args": []
+    },
+    {
+      "name": "check_grant",
+      "discriminator": [223, 172, 131, 140, 15, 133, 209, 250],
+      "accounts": [
+        { "name": "grok_account" },
+        { "name": "grant", "writable": true },
+        { "name": "agent", "signer": true },
+        { "name": "target_program" }
+      ],
+      "args": [
+        { "name": "args", "type": { "defined": { "name": "CheckGrantArgs" } } }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Grant",
+      "discriminator": [161, 166, 11, 205, 204, 135, 205, 54]
+    },
+    {
+      "name": "GrokAccount",
+      "discriminator": [59, 163, 255, 43, 255, 145, 237, 105]
+    }
+  ],
+  "events": [
+    { "name": "AccountCreated", "discriminator": [70, 39, 6, 173, 118, 198, 190, 91] },
+    { "name": "GrantIssued", "discriminator": [119, 88, 64, 175, 62, 153, 137, 125] },
+    { "name": "GrantRevised", "discriminator": [128, 229, 232, 241, 206, 253, 5, 116] },
+    { "name": "GrantRevoked", "discriminator": [192, 60, 253, 12, 110, 158, 200, 30] },
+    { "name": "GrantConsumed", "discriminator": [98, 0, 80, 82, 111, 10, 81, 246] }
+  ],
+  "errors": [
+    { "code": 6000, "name": "UnauthorizedRoot", "msg": "root signer does not match GrokAccount.root" },
+    { "code": 6001, "name": "GrantAlreadyActive", "msg": "an active grant already exists for this agent" },
+    { "code": 6002, "name": "GrantRevoked", "msg": "grant is revoked" },
+    { "code": 6003, "name": "GrantExpired", "msg": "grant is expired" },
+    { "code": 6004, "name": "GrantCapExceeded", "msg": "amount would exceed spend_cap_lamports" },
+    { "code": 6005, "name": "GrantProgramDenied", "msg": "target program is not on the allowlist" },
+    { "code": 6006, "name": "AgentMismatch", "msg": "signer is not the grant agent" },
+    { "code": 6007, "name": "ExpiryRequired", "msg": "expires_at_unix must be non-zero" },
+    { "code": 6008, "name": "ExpiryNotInFuture", "msg": "expires_at_unix must be strictly in the future" },
+    { "code": 6009, "name": "AllowlistTooLong", "msg": "allowed_programs longer than MAX_ALLOWED_PROGRAMS" },
+    { "code": 6010, "name": "AllowlistDuplicate", "msg": "allowed_programs contains a duplicate" },
+    { "code": 6011, "name": "CapBelowSpent", "msg": "spend_cap_lamports is below spent_lamports" },
+    { "code": 6012, "name": "SpendOverflow", "msg": "spent_lamports overflow" },
+    { "code": 6013, "name": "TargetNotExecutable", "msg": "target_program is not executable" },
+    { "code": 6014, "name": "RootMismatch", "msg": "grant.grok_account or grant.root mismatch" },
+    { "code": 6015, "name": "GrantCountOverflow", "msg": "grant_count overflow" }
+  ],
+  "types": [
+    {
+      "name": "AccountCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "grok_account", "type": "pubkey" },
+          { "name": "root", "type": "pubkey" },
+          { "name": "created_at_unix", "type": "i64" }
+        ]
+      }
+    },
+    {
+      "name": "CheckGrantArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [{ "name": "amount_lamports", "type": "u64" }]
+      }
+    },
+    {
+      "name": "Grant",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "grok_account", "type": "pubkey" },
+          { "name": "root", "type": "pubkey" },
+          { "name": "agent", "type": "pubkey" },
+          { "name": "spend_cap_lamports", "type": "u64" },
+          { "name": "spent_lamports", "type": "u64" },
+          { "name": "allowed_programs", "type": { "vec": "pubkey" } },
+          { "name": "expires_at_unix", "type": "i64" },
+          { "name": "revoked", "type": "bool" },
+          { "name": "sponsor_eligible", "type": "bool" },
+          { "name": "bump", "type": "u8" },
+          { "name": "generation", "type": "u32" },
+          { "name": "issued_at_unix", "type": "i64" },
+          { "name": "label", "type": { "array": ["u8", 32] } }
+        ]
+      }
+    },
+    {
+      "name": "GrantConsumed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "grant", "type": "pubkey" },
+          { "name": "grok_account", "type": "pubkey" },
+          { "name": "agent", "type": "pubkey" },
+          { "name": "amount_lamports", "type": "u64" },
+          { "name": "spent_lamports", "type": "u64" },
+          { "name": "spend_cap_lamports", "type": "u64" },
+          { "name": "target_program", "type": "pubkey" },
+          { "name": "generation", "type": "u32" }
+        ]
+      }
+    },
+    {
+      "name": "GrantIssued",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "grant", "type": "pubkey" },
+          { "name": "grok_account", "type": "pubkey" },
+          { "name": "root", "type": "pubkey" },
+          { "name": "agent", "type": "pubkey" },
+          { "name": "spend_cap_lamports", "type": "u64" },
+          { "name": "expires_at_unix", "type": "i64" },
+          { "name": "sponsor_eligible", "type": "bool" },
+          { "name": "generation", "type": "u32" },
+          { "name": "allowed_programs", "type": { "vec": "pubkey" } },
+          { "name": "label", "type": { "array": ["u8", 32] } }
+        ]
+      }
+    },
+    {
+      "name": "GrantPolicyArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "spend_cap_lamports", "type": "u64" },
+          { "name": "allowed_programs", "type": { "vec": "pubkey" } },
+          { "name": "expires_at_unix", "type": "i64" },
+          { "name": "sponsor_eligible", "type": "bool" },
+          { "name": "label", "type": { "array": ["u8", 32] } }
+        ]
+      }
+    },
+    {
+      "name": "GrantRevised",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "grant", "type": "pubkey" },
+          { "name": "grok_account", "type": "pubkey" },
+          { "name": "root", "type": "pubkey" },
+          { "name": "agent", "type": "pubkey" },
+          { "name": "spend_cap_lamports", "type": "u64" },
+          { "name": "spent_lamports", "type": "u64" },
+          { "name": "expires_at_unix", "type": "i64" },
+          { "name": "sponsor_eligible", "type": "bool" },
+          { "name": "generation", "type": "u32" },
+          { "name": "allowed_programs", "type": { "vec": "pubkey" } },
+          { "name": "label", "type": { "array": ["u8", 32] } }
+        ]
+      }
+    },
+    {
+      "name": "GrantRevoked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "grant", "type": "pubkey" },
+          { "name": "grok_account", "type": "pubkey" },
+          { "name": "root", "type": "pubkey" },
+          { "name": "agent", "type": "pubkey" },
+          { "name": "generation", "type": "u32" },
+          { "name": "spent_lamports", "type": "u64" }
+        ]
+      }
+    },
+    {
+      "name": "GrokAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "root", "type": "pubkey" },
+          { "name": "bump", "type": "u8" },
+          { "name": "created_at_unix", "type": "i64" },
+          { "name": "grant_count", "type": "u32" }
+        ]
+      }
+    }
+  ]
+}

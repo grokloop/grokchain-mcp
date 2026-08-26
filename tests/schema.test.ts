@@ -25,6 +25,7 @@ test("docs do not advertise either local-only id as a public deployment", () => 
   const files = [
     join(here, "../README.md"),
     join(here, "../HUMAN.md"),
+    join(here, "../GETTING-STARTED.md"),
     join(here, "../skills/grok-build/SKILL.md"),
     join(here, "../src/config.ts"),
     join(here, "../src/constants.ts"),

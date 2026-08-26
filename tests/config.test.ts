@@ -5,7 +5,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { clusterNotes, loadConfig } from "../src/config.js";
-import { LOCAL_ONLY_INTENTS_PROGRAM_ID, LOCAL_ONLY_PROGRAM_ID } from "../src/constants.js";
+import {
+  DEVNET_CORE_PROGRAM_ID,
+  DEVNET_INTENTS_PROGRAM_ID,
+  LOCAL_ONLY_INTENTS_PROGRAM_ID,
+  LOCAL_ONLY_PROGRAM_ID,
+} from "../src/constants.js";
 
 // TEST FIXTURES only — well-known Solana program ids. Not Grok Chain deployments.
 const FIXTURE_CORE = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
@@ -69,11 +74,37 @@ test("localnet still defaults to the two local-only ids", () => {
   }
 });
 
-test("cluster=devnet with no ids throws waiting / required", () => {
+test("cluster=devnet auto-loads config/devnet.json real deployed ids", () => {
   const snap = snapshotEnv();
   try {
     clearIds();
     process.env.GROKCHAIN_CLUSTER = "devnet";
+    const cfg = loadConfig();
+    assert.equal(cfg.cluster, "devnet");
+    assert.equal(cfg.rpcUrl, "https://api.devnet.solana.com");
+    assert.equal(cfg.programId.toBase58(), DEVNET_CORE_PROGRAM_ID);
+    assert.equal(cfg.intentsProgramId.toBase58(), DEVNET_INTENTS_PROGRAM_ID);
+    assert.equal(cfg.programId.toBase58(), "7UtafKBBWNHEXC9PaNXu8USdZqL6VEWupsL7rS6LeVDj");
+    assert.equal(cfg.intentsProgramId.toBase58(), "EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz");
+    assert.equal(cfg.localOnlyProgram, false);
+    assert.equal(cfg.localOnlyIntents, false);
+    const notes = clusterNotes(cfg).join("\n");
+    assert.match(notes, /7UtafKBBWNHEXC9PaNXu8USdZqL6VEWupsL7rS6LeVDj/);
+    assert.match(notes, /EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz/);
+    assert.match(notes, /grokchain-devnet deployed programs/);
+    assert.match(notes, /no seed export/i);
+    assert.doesNotMatch(notes, /8WDhHSfrz6hMkmX7WteAAmyuWFLryHM2Kfc1r4k8EFXE/);
+    assert.doesNotMatch(notes, /AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2/);
+  } finally {
+    restoreEnv(snap);
+  }
+});
+
+test("cluster=mainnet-beta with no ids throws waiting / required", () => {
+  const snap = snapshotEnv();
+  try {
+    clearIds();
+    process.env.GROKCHAIN_CLUSTER = "mainnet-beta";
     assert.throws(() => loadConfig(), /waiting|required/i);
   } finally {
     restoreEnv(snap);
@@ -182,11 +213,33 @@ test("cluster=devnet + two valid fixture pubkeys that are not banned succeeds", 
   }
 });
 
-test("loading config/devnet.json as-is (null ids) throws waiting", () => {
+test("loading config/devnet.json loads real grokchain-devnet ids", () => {
   const snap = snapshotEnv();
   try {
     clearIds();
     process.env.GROKCHAIN_CONFIG = REPO_DEVNET_JSON;
+    const cfg = loadConfig();
+    assert.equal(cfg.cluster, "devnet");
+    assert.equal(cfg.programId.toBase58(), DEVNET_CORE_PROGRAM_ID);
+    assert.equal(cfg.intentsProgramId.toBase58(), DEVNET_INTENTS_PROGRAM_ID);
+    assert.equal(cfg.localOnlyProgram, false);
+    assert.equal(cfg.localOnlyIntents, false);
+  } finally {
+    restoreEnv(snap);
+  }
+});
+
+test("a temp json with null ids throws waiting", () => {
+  const snap = snapshotEnv();
+  try {
+    clearIds();
+    const p = writeTempConfig({
+      cluster: "mainnet-beta",
+      rpcUrl: "https://api.mainnet-beta.solana.com",
+      coreProgramId: null,
+      intentsProgramId: null,
+    });
+    process.env.GROKCHAIN_CONFIG = p;
     assert.throws(() => loadConfig(), /waiting|required/i);
   } finally {
     restoreEnv(snap);

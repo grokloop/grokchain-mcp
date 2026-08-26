@@ -2,7 +2,12 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Connection, PublicKey } from "@solana/web3.js";
-import { LOCAL_ONLY_INTENTS_PROGRAM_ID, LOCAL_ONLY_PROGRAM_ID } from "./constants.js";
+import {
+  DEVNET_CORE_PROGRAM_ID,
+  DEVNET_INTENTS_PROGRAM_ID,
+  LOCAL_ONLY_INTENTS_PROGRAM_ID,
+  LOCAL_ONLY_PROGRAM_ID,
+} from "./constants.js";
 import type { Cluster } from "./types.js";
 
 export type AppConfig = {
@@ -134,6 +139,7 @@ function resolveProgramId(opts: {
   fileValue: string | null | undefined;
   envValue: string | undefined;
   localOnlyId: string;
+  deployedDefault?: string;
   label: string;
 }): { id: PublicKey; localOnly: boolean } {
   const value = firstId(opts.envValue, opts.fileValue);
@@ -146,12 +152,17 @@ function resolveProgramId(opts: {
     };
   }
 
-  if (!value) {
+  // cluster=devnet only: grokchain-devnet defaults from json / explicit constant.
+  // Never applied on localnet. Never fall back to the local-only pair.
+  const resolved =
+    value ?? (opts.cluster === "devnet" ? opts.deployedDefault : undefined);
+
+  if (!resolved) {
     throw new Error(WAITING_ON_CORE_AND_PROGRAMS);
   }
 
   return {
-    id: parseDeployedProgramId(value, opts.label),
+    id: parseDeployedProgramId(resolved, opts.label),
     localOnly: false,
   };
 }
@@ -184,6 +195,7 @@ export function loadConfig(): AppConfig {
     envValue: process.env.GROKCHAIN_PROGRAM_ID,
     fileValue: file?.coreProgramId,
     localOnlyId: LOCAL_ONLY_PROGRAM_ID,
+    deployedDefault: DEVNET_CORE_PROGRAM_ID,
     label: "CORE",
   });
   const intents = resolveProgramId({
@@ -192,6 +204,7 @@ export function loadConfig(): AppConfig {
     envValue: process.env.GROKCHAIN_INTENTS_PROGRAM_ID,
     fileValue: file?.intentsProgramId,
     localOnlyId: LOCAL_ONLY_INTENTS_PROGRAM_ID,
+    deployedDefault: DEVNET_INTENTS_PROGRAM_ID,
     label: "INTENTS",
   });
 
@@ -227,12 +240,17 @@ export function clusterNotes(cfg: AppConfig): string[] {
   if (cfg.cluster === "devnet" || cfg.cluster === "mainnet-beta") {
     if (cfg.localOnlyProgram || cfg.localOnlyIntents) {
       notes.push(
-        "Waiting on CORE and PROGRAMS for real deployed ids. The grokchain-devnet slot stays empty until they send them.",
+        "Waiting on CORE and PROGRAMS for real deployed ids. Do not treat the local-only pair as live.",
       );
     } else {
       notes.push(
-        "CORE and INTENTS program ids came from the grokchain-devnet config / env and are treated as deployed. Still no seed export.",
+        `CORE ${cfg.programId.toBase58()} and INTENTS ${cfg.intentsProgramId.toBase58()} came from the grokchain-devnet config / env and are treated as deployed. Still no seed export.`,
       );
+      if (cfg.cluster === "devnet") {
+        notes.push(
+          `CORE ${cfg.programId.toBase58()} and INTENTS ${cfg.intentsProgramId.toBase58()} are the grokchain-devnet deployed programs. Still no seed export.`,
+        );
+      }
     }
   }
   notes.push(

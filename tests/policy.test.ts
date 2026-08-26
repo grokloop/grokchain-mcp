@@ -3,7 +3,13 @@ import { test } from "node:test";
 import { SystemProgram } from "@solana/web3.js";
 import { PolicyError, rejectSecretFields, validateCheckGrant, validatePay, validatePolicy } from "../src/policy.js";
 import { payTool } from "../src/tools/pay.js";
-import { LOCAL_ONLY_INTENTS_PROGRAM_ID, LOCAL_ONLY_PROGRAM_ID, MAX_SPONSOR_LAMPORTS } from "../src/constants.js";
+import {
+  DEVNET_CORE_PROGRAM_ID,
+  DEVNET_INTENTS_PROGRAM_ID,
+  LOCAL_ONLY_INTENTS_PROGRAM_ID,
+  LOCAL_ONLY_PROGRAM_ID,
+  MAX_SPONSOR_LAMPORTS,
+} from "../src/constants.js";
 import { swapTool } from "../src/tools/stubs.js";
 
 test("rejects expiry 0, expiry not in future, allowlist too long, duplicates", () => {
@@ -128,4 +134,47 @@ test("swap is an honest IntentStub", async () => {
 test("local-only program ids are the documented localnet default strings", () => {
   assert.equal(LOCAL_ONLY_PROGRAM_ID, "8WDhHSfrz6hMkmX7WteAAmyuWFLryHM2Kfc1r4k8EFXE");
   assert.equal(LOCAL_ONLY_INTENTS_PROGRAM_ID, "AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2");
+});
+
+test("devnet program ids are the grokchain-devnet deployed strings", () => {
+  assert.equal(DEVNET_CORE_PROGRAM_ID, "7UtafKBBWNHEXC9PaNXu8USdZqL6VEWupsL7rS6LeVDj");
+  assert.equal(DEVNET_INTENTS_PROGRAM_ID, "EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz");
+});
+
+const KEY_ENV = [
+  "GROKCHAIN_CLUSTER",
+  "GROKCHAIN_RPC_URL",
+  "GROKCHAIN_PROGRAM_ID",
+  "GROKCHAIN_INTENTS_PROGRAM_ID",
+  "GROKCHAIN_CONFIG",
+  "GROKCHAIN_ROOT_KEYPAIR",
+  "GROKCHAIN_AGENT_KEYPAIR",
+  "GROKCHAIN_RELAYER_KEYPAIR",
+] as const;
+
+test("cluster=devnet pay builds against real INTENTS and returns need_human without faking a send", async () => {
+  const snap: Record<string, string | undefined> = {};
+  for (const k of KEY_ENV) snap[k] = process.env[k];
+  try {
+    for (const k of KEY_ENV) delete process.env[k];
+    process.env.GROKCHAIN_CLUSTER = "devnet";
+    const r = await payTool({
+      to: SystemProgram.programId.toBase58(),
+      amount_lamports: 1,
+      root: SystemProgram.programId.toBase58(),
+    });
+    assert.notEqual(r.status, "stub");
+    assert.notEqual(r.status, "ok");
+    assert.equal(r.moved_sol ?? false, false);
+    assert.ok(r.status === "need_human_setup" || r.status === "need_human_signature");
+    assert.equal(r.cluster, "devnet");
+    assert.equal(r.program_id, DEVNET_CORE_PROGRAM_ID);
+    assert.equal(r.intents_program_id, DEVNET_INTENTS_PROGRAM_ID);
+    assert.match(JSON.stringify(r), /HUMAN\.md|never holds SOL|RELAYER|AGENT/i);
+  } finally {
+    for (const k of KEY_ENV) {
+      if (snap[k] === undefined) delete process.env[k];
+      else process.env[k] = snap[k];
+    }
+  }
 });

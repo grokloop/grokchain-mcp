@@ -1,6 +1,6 @@
 {
   "cluster": "devnet",
   "rpcUrl": "https://api.devnet.solana.com",
-  "coreProgramId": null,
-  "intentsProgramId": null
+  "coreProgramId": "7UtafKBBWNHEXC9PaNXu8USdZqL6VEWupsL7rS6LeVDj",
+  "intentsProgramId": "EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz"
 }

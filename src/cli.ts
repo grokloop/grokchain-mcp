@@ -7,6 +7,7 @@ import {
   initRelayerKeystore,
   loadKeyFromEnvPath,
 } from "./keys.js";
+import { isSetupDevnet, normalizeCliCmd, runSetupDevnet } from "./setup.js";
 import { checkGrantTool } from "./tools/check_grant.js";
 import { createAccountTool } from "./tools/create_account.js";
 import { issueGrantTool } from "./tools/issue_grant.js";
@@ -71,13 +72,19 @@ Commands:
       Generate a 0600 keystore. Prints pubkey only. Relayer is the fee payer.
   grokchain relayer pubkey
   grokchain status [--agent <pk>]
+  grokchain setup --devnet [--yes]
+      One command on grokchain-devnet. Equivalent: setup --devnet or setup devnet.
+      Only GROKCHAIN_ROOT_KEYPAIR (or ~/.config/solana/id.json) is required.
+      Creates agent+relayer 0600 keystores (reuses if present), airdrops if it can,
+      create_account, issue_grant (allowlist EYhYtq…), SpendVault + Paymaster.
+      Prints an MCP snippet. Does not send a pay. Idempotent. See GETTING-STARTED.md.
 
 removed: grokchain fund --to agent (old wrong path).
 The bot/agent never holds SOL and is never the fee payer.
 Human funds SpendVault (pay source) and Paymaster (gas). Relayer submits.
 
 localnet uses the local-only CORE + INTENTS pair. Devnet uses the
-grokchain-devnet deployed ids. See HUMAN.md.
+grokchain-devnet deployed ids. See GETTING-STARTED.md and HUMAN.md.
 `;
 }
 
@@ -146,7 +153,9 @@ async function status(flags: Flags): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const { cmd, flags } = parseArgs(process.argv.slice(2));
+  const parsed = parseArgs(process.argv.slice(2));
+  const flags = parsed.flags;
+  const cmd = normalizeCliCmd(parsed.cmd);
   if (flags.config === true) {
     throw new Error("missing --config <path> (e.g. config/devnet.json)");
   }
@@ -278,6 +287,17 @@ async function main(): Promise<void> {
       throw new Error(loaded.reason ?? "relayer keystore missing");
     }
     printJson({ pubkey: loaded.pubkey.toBase58(), path: loaded.path });
+    return;
+  }
+  if (cmd[0] === "setup") {
+    if (!isSetupDevnet(cmd, flags)) {
+      process.stderr.write("setup currently supports --devnet (or: grokchain setup devnet). See GETTING-STARTED.md.\n");
+      process.exit(1);
+    }
+    const result = await runSetupDevnet({ yes: flags.yes === true });
+    if (result.status !== "ok") {
+      process.exit(1);
+    }
     return;
   }
   if (cmd[0] === "status") {

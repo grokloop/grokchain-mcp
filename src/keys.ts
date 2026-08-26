@@ -114,3 +114,27 @@ export function parsePubkey(s: string, label: string): PublicKey {
     throw new Error(`${label} is not a valid Solana pubkey`);
   }
 }
+
+export type EnsuredKeystore = {
+  path: string;
+  pubkey: PublicKey;
+  reused: boolean;
+};
+
+/**
+ * Reuse an existing keystore (do not overwrite) or create a new 0600 file.
+ * Returns the pubkey only. Never prints secret bytes.
+ */
+export function ensureKeystore(outPath: string): EnsuredKeystore {
+  if (existsSync(outPath)) {
+    const kp = loadKeypairFromPath(outPath);
+    return { path: outPath, pubkey: kp.publicKey, reused: true };
+  }
+  const pubkey = initAgentKeystore(outPath);
+  return { path: outPath, pubkey, reused: false };
+}
+
+/** reuse if the file exists; create otherwise. Never overwrite. */
+export function planKeystoreAction(fileExists: boolean): "reuse" | "create" {
+  return fileExists ? "reuse" : "create";
+}

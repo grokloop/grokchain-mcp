@@ -1,5 +1,7 @@
 # HUMAN.md
 
+Short path on **devnet**: [GETTING-STARTED.md](./GETTING-STARTED.md) — `grokchain setup --devnet`. This file is the long form.
+
 This file is for the **human**, not the bot. The bot talks intents. The bot never sees a seed phrase or raw key. Keys live only on this host in `0600` files. Env vars name **paths**, not secrets.
 
 On **localnet**, CORE and INTENTS default to the local-only validator pair. Those ids are **not** a deployed program. They are not on devnet. They are not on mainnet. Do not treat them as live.

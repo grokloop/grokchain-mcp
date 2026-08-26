@@ -1,46 +1,75 @@
 #!/usr/bin/env node
+import { LOCAL_ONLY_INTENTS_PROGRAM_ID } from "./constants.js";
 import {
-  LAMPORTS_PER_SOL,
-  PublicKey,
-  SystemProgram,
-  Transaction,
-  sendAndConfirmTransaction,
-} from "@solana/web3.js";
-import { connectionOf, loadConfig } from "./config.js";
-import { defaultAgentPath, defaultRootPath, initAgentKeystore, loadKeyFromEnvPath, parsePubkey } from "./keys.js";
+  defaultAgentPath,
+  defaultRelayerPath,
+  initAgentKeystore,
+  initRelayerKeystore,
+  loadKeyFromEnvPath,
+} from "./keys.js";
 import { checkGrantTool } from "./tools/check_grant.js";
 import { createAccountTool } from "./tools/create_account.js";
 import { issueGrantTool } from "./tools/issue_grant.js";
 import { getAccountTool, getGrantTool } from "./tools/reads.js";
 import { reviseGrantTool } from "./tools/revise_grant.js";
 import { revokeGrantTool } from "./tools/revoke_grant.js";
+import {
+  fundPaymasterTool,
+  fundSpendVaultTool,
+  initPaymasterTool,
+  initSpendVaultTool,
+  pausePaymasterTool,
+  setRelayerTool,
+  unpausePaymasterTool,
+  vaultStatus,
+  withdrawPaymasterTool,
+  withdrawSpendVaultTool,
+} from "./tools/vaults.js";
 
 function usage(): string {
-  return `grokchain — human CLI for Grok Chain CORE (local-only today)
+  return `grokchain — human CLI for Grok Chain CORE + INTENTS (local-only today)
 
 Env (paths, never secrets):
-  GROKCHAIN_CLUSTER          localnet|devnet|mainnet-beta (default localnet)
+  GROKCHAIN_CLUSTER                 localnet|devnet|mainnet-beta (default localnet)
   GROKCHAIN_RPC_URL
-  GROKCHAIN_PROGRAM_ID       required except localnet
-  GROKCHAIN_ROOT_KEYPAIR     path to human wallet (Solana CLI JSON)
-  GROKCHAIN_AGENT_KEYPAIR    path to agent keystore (0600)
+  GROKCHAIN_PROGRAM_ID              CORE id; required except localnet
+  GROKCHAIN_INTENTS_PROGRAM_ID      INTENTS id; required except localnet
+  GROKCHAIN_ROOT_KEYPAIR            path to human wallet (Solana CLI JSON)
+  GROKCHAIN_AGENT_KEYPAIR           path to agent keystore (0600)
+  GROKCHAIN_RELAYER_KEYPAIR         path to relayer keystore (0600)
 
 Commands:
   grokchain root create-account
   grokchain root issue-grant --agent <pk> --cap <lamports> --expires <unix> --programs <csv>
                              [--sponsor] [--label <text>]
+      --programs is router mode: allowlist the local-only INTENTS id
+      (${LOCAL_ONLY_INTENTS_PROGRAM_ID}), not SystemProgram.
+      --sponsor means this grant may use YOUR paymaster — not a promise Grok Chain pays.
   grokchain root revise-grant --agent <pk> --cap <lamports> --expires <unix> --programs <csv>
                              [--sponsor] [--label <text>]
   grokchain root revoke-grant --agent <pk>
-  grokchain fund --to agent|<pubkey> --sol <n>
-      System transfer from root to agent for FEES.
-      This is the human paying gas, not the protocol. CORE is not a vault.
+  grokchain vault init-spend
+  grokchain vault fund-spend --sol <n>
+  grokchain vault withdraw-spend --sol <n>
+  grokchain paymaster init --relayer <pk>
+  grokchain paymaster fund --sol <n>
+  grokchain paymaster withdraw --sol <n>
+  grokchain paymaster set-relayer --relayer <pk>
+  grokchain paymaster pause
+  grokchain paymaster unpause
   grokchain agent init [--out <path>]
       Generate a 0600 keystore. Prints pubkey only.
   grokchain agent pubkey
+  grokchain relayer init [--out <path>]
+      Generate a 0600 keystore. Prints pubkey only. Relayer is the fee payer.
+  grokchain relayer pubkey
   grokchain status [--agent <pk>]
 
-CORE is local-only today. Not deployed. See HUMAN.md.
+removed: grokchain fund --to agent (old wrong path).
+The bot/agent never holds SOL and is never the fee payer.
+Human funds SpendVault (pay source) and Paymaster (gas). Relayer submits.
+
+CORE and INTENTS are local-only today. Not deployed. See HUMAN.md.
 `;
 }
 
@@ -89,52 +118,8 @@ function printJson(v: unknown): void {
   process.stdout.write(`${JSON.stringify(v, null, 2)}\n`);
 }
 
-async function fund(flags: Flags): Promise<void> {
-  const cfg = loadConfig();
-  const root = loadKeyFromEnvPath("GROKCHAIN_ROOT_KEYPAIR");
-  if (!root.keypair || !root.pubkey) {
-    throw new Error(
-      `${root.reason ?? "GROKCHAIN_ROOT_KEYPAIR missing"}\nHuman pays gas. See HUMAN.md.`,
-    );
-  }
-  const toRaw = req(flags, "to");
-  let dest: PublicKey;
-  if (toRaw === "agent") {
-    const agent = loadKeyFromEnvPath("GROKCHAIN_AGENT_KEYPAIR");
-    if (!agent.pubkey) {
-      throw new Error(agent.reason ?? "agent keystore missing");
-    }
-    dest = agent.pubkey;
-  } else {
-    dest = parsePubkey(toRaw, "--to");
-  }
-  const sol = Number(req(flags, "sol"));
-  if (!Number.isFinite(sol) || sol <= 0) {
-    throw new Error("--sol must be a positive number of SOL");
-  }
-  const lamports = Math.round(sol * LAMPORTS_PER_SOL);
-  const connection = connectionOf(cfg);
-  const tx = new Transaction().add(
-    SystemProgram.transfer({
-      fromPubkey: root.pubkey,
-      toPubkey: dest,
-      lamports,
-    }),
-  );
-  const sig = await sendAndConfirmTransaction(connection, tx, [root.keypair], {
-    commitment: "confirmed",
-  });
-  printJson({
-    status: "ok",
-    kind: "system_transfer",
-    note: "Human paying gas (fees) to the agent. This is NOT a protocol pay and NOT a CORE vault debit.",
-    from: root.pubkey.toBase58(),
-    to: dest.toBase58(),
-    sol,
-    lamports,
-    signature: sig,
-    cluster: cfg.cluster,
-  });
+function dry(flags: Flags): boolean {
+  return flags["dry-run"] === true;
 }
 
 async function status(flags: Flags): Promise<void> {
@@ -144,9 +129,11 @@ async function status(flags: Flags): Promise<void> {
       : loadKeyFromEnvPath("GROKCHAIN_AGENT_KEYPAIR").pubkey?.toBase58();
   const acc = await getAccountTool({});
   const grant = agent ? await getGrantTool({ agent }) : undefined;
+  const vaults = await vaultStatus({ agent });
   printJson({
     account: acc,
     grant: grant ?? { status: "skipped", reason: "no --agent and no GROKCHAIN_AGENT_KEYPAIR" },
+    vaults,
   });
 }
 
@@ -154,12 +141,12 @@ async function main(): Promise<void> {
   const { cmd, flags } = parseArgs(process.argv.slice(2));
   if (flags.help || cmd.length === 0) {
     process.stdout.write(usage());
-    process.exit(flags.help || cmd.length === 0 ? 0 : 1);
+    process.exit(0);
   }
 
   const head = cmd.join(" ");
   if (head === "root create-account") {
-    printJson(await createAccountTool({ dry_run: flags["dry-run"] === true }));
+    printJson(await createAccountTool({ dry_run: dry(flags) }));
     return;
   }
   if (head === "root issue-grant") {
@@ -171,7 +158,7 @@ async function main(): Promise<void> {
         allowed_programs: programsOf(flags),
         sponsor_eligible: flags.sponsor === true,
         label: typeof flags.label === "string" ? flags.label : undefined,
-        dry_run: flags["dry-run"] === true,
+        dry_run: dry(flags),
       }),
     );
     return;
@@ -185,18 +172,61 @@ async function main(): Promise<void> {
         allowed_programs: programsOf(flags),
         sponsor_eligible: flags.sponsor === true,
         label: typeof flags.label === "string" ? flags.label : undefined,
-        dry_run: flags["dry-run"] === true,
+        dry_run: dry(flags),
       }),
     );
     return;
   }
   if (head === "root revoke-grant") {
-    printJson(await revokeGrantTool({ agent: req(flags, "agent"), dry_run: flags["dry-run"] === true }));
+    printJson(await revokeGrantTool({ agent: req(flags, "agent"), dry_run: dry(flags) }));
+    return;
+  }
+  if (head === "vault init-spend") {
+    printJson(await initSpendVaultTool({ dry_run: dry(flags) }));
+    return;
+  }
+  if (head === "vault fund-spend") {
+    printJson(await fundSpendVaultTool({ sol: req(flags, "sol"), dry_run: dry(flags) }));
+    return;
+  }
+  if (head === "vault withdraw-spend") {
+    printJson(await withdrawSpendVaultTool({ sol: req(flags, "sol"), dry_run: dry(flags) }));
+    return;
+  }
+  if (head === "paymaster init") {
+    printJson(await initPaymasterTool({ relayer: req(flags, "relayer"), dry_run: dry(flags) }));
+    return;
+  }
+  if (head === "paymaster fund") {
+    printJson(await fundPaymasterTool({ sol: req(flags, "sol"), dry_run: dry(flags) }));
+    return;
+  }
+  if (head === "paymaster withdraw") {
+    printJson(await withdrawPaymasterTool({ sol: req(flags, "sol"), dry_run: dry(flags) }));
+    return;
+  }
+  if (head === "paymaster set-relayer") {
+    printJson(await setRelayerTool({ relayer: req(flags, "relayer"), dry_run: dry(flags) }));
+    return;
+  }
+  if (head === "paymaster pause") {
+    printJson(await pausePaymasterTool({ dry_run: dry(flags) }));
+    return;
+  }
+  if (head === "paymaster unpause") {
+    printJson(await unpausePaymasterTool({ dry_run: dry(flags) }));
     return;
   }
   if (cmd[0] === "fund") {
-    await fund(flags);
-    return;
+    process.stderr.write(
+      "grokchain fund --to agent is removed (old wrong path).\n" +
+        "The bot/agent never holds SOL and is never the fee payer.\n" +
+        "Human funds SpendVault (pay source) and Paymaster (gas):\n" +
+        "  grokchain vault fund-spend --sol N\n" +
+        "  grokchain paymaster fund --sol N\n" +
+        "Relayer submits. See HUMAN.md.\n",
+    );
+    process.exit(1);
   }
   if (head === "agent init") {
     const out = typeof flags.out === "string" ? flags.out : defaultAgentPath();
@@ -217,17 +247,34 @@ async function main(): Promise<void> {
     printJson({ pubkey: loaded.pubkey.toBase58(), path: loaded.path });
     return;
   }
+  if (head === "relayer init") {
+    const out = typeof flags.out === "string" ? flags.out : defaultRelayerPath();
+    const pk = initRelayerKeystore(out);
+    printJson({
+      status: "ok",
+      pubkey: pk.toBase58(),
+      path: out,
+      note: "keystore written mode 0600. pubkey only is printed. set GROKCHAIN_RELAYER_KEYPAIR to this path. Relayer is the fee payer. Bot never holds SOL.",
+    });
+    return;
+  }
+  if (head === "relayer pubkey") {
+    const loaded = loadKeyFromEnvPath("GROKCHAIN_RELAYER_KEYPAIR", defaultRelayerPath());
+    if (!loaded.pubkey) {
+      throw new Error(loaded.reason ?? "relayer keystore missing");
+    }
+    printJson({ pubkey: loaded.pubkey.toBase58(), path: loaded.path });
+    return;
+  }
   if (cmd[0] === "status") {
     await status(flags);
     return;
   }
-  if (head === "root" || head === "agent") {
+  if (head === "root" || head === "agent" || head === "vault" || head === "paymaster" || head === "relayer") {
     process.stderr.write(usage());
     process.exit(1);
   }
 
-  // unused default-root-path helper keeps the Solana default documented
-  void defaultRootPath;
   void checkGrantTool;
 
   process.stderr.write(`unknown command: ${head}\n\n${usage()}`);

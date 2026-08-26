@@ -67,3 +67,16 @@ export function decodeLabel(bytes: Buffer): string {
     return slice.toString("hex");
   }
 }
+
+/** Borsh PayArgs: u64 amount_lamports + u64 sponsor_lamports */
+export function encodePayArgs(args: {
+  amountLamports: bigint | number | string;
+  sponsorLamports: bigint | number | string;
+}): Buffer {
+  return Buffer.concat([encodeU64(args.amountLamports), encodeU64(args.sponsorLamports)]);
+}
+
+export function encodePubkey(key: PublicKey): Buffer {
+  return Buffer.from(key.toBuffer());
+}
+

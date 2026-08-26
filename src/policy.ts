@@ -1,5 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
-import { FORBIDDEN_SECRET_FIELDS, MAX_ALLOWED_PROGRAMS } from "./constants.js";
+import { FORBIDDEN_SECRET_FIELDS, MAX_ALLOWED_PROGRAMS, MAX_SPONSOR_LAMPORTS } from "./constants.js";
 
 export class PolicyError extends Error {
   code: string;
@@ -55,16 +55,18 @@ export function validatePolicy(args: {
   const warnings: string[] = [];
   if (args.allowedPrograms.length === 0) {
     warnings.push(
-      "empty allowlist: check_grant will be denied. v1 allowlist is router mode — allowlist the PROGRAMS router, not every inner DEX.",
+      "empty allowlist: check_grant will be denied. v1 allowlist is router mode — allowlist the INTENTS program id (local-only), not every inner DEX.",
     );
   }
   if (args.spendCapLamports === 0n) {
     warnings.push("cap 0 = call-only: check_grant amount must be 0");
   }
   warnings.push(
-    "v1 allowlist is router mode: the human allowlists the PROGRAMS router, not every inner DEX.",
+    "v1 allowlist is router mode: the human allowlists the INTENTS program id (local-only), not every inner DEX.",
   );
-  warnings.push("sponsor_eligible is a stored hook only; we do not sponsor gas.");
+  warnings.push(
+    "sponsor_eligible means this grant may use YOUR paymaster — not a promise Grok Chain pays.",
+  );
   return { warnings };
 }
 
@@ -84,6 +86,34 @@ export function validateCheckGrant(args: {
     throw new PolicyError(
       "GrantCapExceeded",
       "cap 0 = call-only; check amount must be 0",
+    );
+  }
+  return { warnings };
+}
+
+export function validatePay(args: {
+  amountLamports: bigint;
+  sponsorLamports: bigint;
+}): { warnings: string[] } {
+  if (args.amountLamports <= 0n) {
+    throw new PolicyError(
+      "ZeroPayAmount",
+      "pay amount_lamports must be greater than zero",
+    );
+  }
+  if (args.sponsorLamports > BigInt(MAX_SPONSOR_LAMPORTS)) {
+    throw new PolicyError(
+      "SponsorCapExceeded",
+      `sponsor_lamports exceeds MAX_SPONSOR_LAMPORTS (${MAX_SPONSOR_LAMPORTS})`,
+    );
+  }
+  const warnings: string[] = [
+    "pay is the INTENTS client. Agent signs. Relayer is the outer fee payer. Bot never holds SOL.",
+    "Human funds SpendVault (pay source) and Paymaster (gas). Two deposits.",
+  ];
+  if (args.sponsorLamports > 0n) {
+    warnings.push(
+      "sponsor_lamports > 0 requires GROKCHAIN_RELAYER_KEYPAIR as fee payer and a live paymaster.",
     );
   }
   return { warnings };

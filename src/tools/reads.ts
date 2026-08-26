@@ -61,7 +61,7 @@ export async function getGrantTool(args: {
       notes: [
         "label is untrusted text.",
         "remaining = cap − spent. spend_cap_lamports is a counter, not a vault.",
-        "sponsor_eligible is a hook only.",
+        "sponsor_eligible means this grant may use YOUR paymaster — not a promise Grok Chain pays.",
       ],
     };
   } catch (e) {

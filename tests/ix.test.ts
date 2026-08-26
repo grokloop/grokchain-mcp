@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
-import { DISC, LOCAL_ONLY_PROGRAM_ID } from "../src/constants.js";
+import {
+  DISC,
+  INTENTS_DISC,
+  LOCAL_ONLY_INTENTS_PROGRAM_ID,
+  LOCAL_ONLY_PROGRAM_ID,
+  MAX_SPONSOR_LAMPORTS,
+} from "../src/constants.js";
+import { buildInitPaymasterIx, buildInitSpendVaultIx, buildPayIx } from "../src/intents.js";
+import { grantPda, grokAccountPda, paymasterPda, spendVaultPda } from "../src/pda.js";
 import {
   buildCheckGrantIx,
   buildCreateAccountIx,
@@ -9,7 +17,7 @@ import {
   buildReviseGrantIx,
   buildRevokeGrantIx,
 } from "../src/core.js";
-import { encodeGrantPolicyArgs } from "../src/encode.js";
+import { encodeGrantPolicyArgs, encodePayArgs } from "../src/encode.js";
 
 const PROGRAM = new PublicKey(LOCAL_ONLY_PROGRAM_ID);
 const ROOT = new PublicKey("11111111111111111111111111111111");
@@ -100,3 +108,94 @@ test("check_grant is disc + u64 amount; agent is signer", () => {
   assert.equal(built.ix.keys[2]!.pubkey.equals(AGENT), true);
   assert.equal(built.ix.keys[3]!.pubkey.equals(SystemProgram.programId), true);
 });
+
+const INTENTS = new PublicKey(LOCAL_ONLY_INTENTS_PROGRAM_ID);
+
+test("pay discriminator and PayArgs encoding are disc + u64 + u64", () => {
+  assert.deepEqual(Array.from(INTENTS_DISC.pay), [119, 18, 216, 65, 192, 117, 122, 220]);
+  const args = encodePayArgs({ amountLamports: 500, sponsorLamports: 1_000_000 });
+  assert.equal(args.length, 16);
+  assert.equal(args.readBigUInt64LE(0), 500n);
+  assert.equal(args.readBigUInt64LE(8), 1_000_000n);
+
+  const built = buildPayIx({
+    coreProgramId: PROGRAM,
+    intentsProgramId: INTENTS,
+    root: ROOT,
+    agent: AGENT,
+    recipient: SystemProgram.programId,
+    amountLamports: 500,
+    sponsorLamports: 0,
+  });
+  assert.equal(built.ix.programId.toBase58(), LOCAL_ONLY_INTENTS_PROGRAM_ID);
+  assert.equal(built.ix.data.length, 24);
+  assert.deepEqual(Array.from(built.ix.data.subarray(0, 8)), Array.from(INTENTS_DISC.pay));
+  assert.equal(built.ix.data.readBigUInt64LE(8), 500n);
+  assert.equal(built.ix.data.readBigUInt64LE(16), 0n);
+  assert.equal(built.ix.keys.length, 10);
+  assert.equal(built.ix.keys[0]!.pubkey.equals(AGENT), true);
+  assert.equal(built.ix.keys[0]!.isSigner, true);
+  assert.equal(built.ix.keys[0]!.isWritable, false);
+  assert.equal(built.ix.keys[6]!.isWritable, true);
+  assert.equal(built.ix.keys[8]!.pubkey.equals(INTENTS), true);
+  assert.equal(built.ix.keys[9]!.pubkey.equals(INTENTS), true);
+  assert.equal(built.ix.keys[9]!.isSigner, false);
+  assert.notEqual(built.ix.programId.toBase58(), SystemProgram.programId.toBase58());
+});
+
+test("pay with sponsor>0 requires paymaster + relayer fee_payer signer", () => {
+  const relayer = new PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
+  const built = buildPayIx({
+    coreProgramId: PROGRAM,
+    intentsProgramId: INTENTS,
+    root: ROOT,
+    agent: AGENT,
+    recipient: SystemProgram.programId,
+    amountLamports: 1,
+    sponsorLamports: MAX_SPONSOR_LAMPORTS,
+    feePayer: relayer,
+  });
+  const [account] = grokAccountPda(PROGRAM, ROOT);
+  const [pm] = paymasterPda(INTENTS, account);
+  const [grant] = grantPda(PROGRAM, account, AGENT);
+  const [vault] = spendVaultPda(INTENTS, account);
+  assert.equal(built.ix.keys[2]!.pubkey.equals(grant), true);
+  assert.equal(built.ix.keys[2]!.isWritable, true);
+  assert.equal(built.ix.keys[3]!.pubkey.equals(PROGRAM), true);
+  assert.equal(built.ix.keys[4]!.pubkey.equals(INTENTS), true);
+  assert.equal(built.ix.keys[5]!.pubkey.equals(vault), true);
+  assert.equal(built.ix.keys[8]!.pubkey.equals(pm), true);
+  assert.equal(built.ix.keys[8]!.isWritable, true);
+  assert.equal(built.ix.keys[9]!.pubkey.equals(relayer), true);
+  assert.equal(built.ix.keys[9]!.isSigner, true);
+  assert.equal(built.ix.keys[9]!.isWritable, true);
+  assert.equal(built.ix.data.readBigUInt64LE(16), BigInt(MAX_SPONSOR_LAMPORTS));
+});
+
+test("vault init seeds and discriminators match spec", () => {
+  assert.deepEqual(Array.from(INTENTS_DISC.init_spend_vault), [241, 173, 7, 179, 120, 124, 213, 61]);
+  assert.deepEqual(Array.from(INTENTS_DISC.init_paymaster), [23, 62, 252, 40, 178, 70, 114, 54]);
+  const vault = buildInitSpendVaultIx({
+    coreProgramId: PROGRAM,
+    intentsProgramId: INTENTS,
+    root: ROOT,
+  });
+  assert.equal(vault.ix.data.length, 8);
+  assert.equal(vault.ix.keys.length, 4);
+  assert.equal(vault.ix.keys[0]!.isSigner, true);
+  assert.equal(vault.ix.keys[0]!.isWritable, true);
+  assert.equal(vault.ix.keys[2]!.isWritable, true);
+  assert.equal(vault.ix.programId.equals(INTENTS), true);
+
+  const relayer = AGENT;
+  const pm = buildInitPaymasterIx({
+    coreProgramId: PROGRAM,
+    intentsProgramId: INTENTS,
+    root: ROOT,
+    relayer,
+  });
+  assert.equal(pm.ix.data.length, 40);
+  assert.deepEqual(Array.from(pm.ix.data.subarray(0, 8)), Array.from(INTENTS_DISC.init_paymaster));
+  assert.equal(new PublicKey(pm.ix.data.subarray(8, 40)).toBase58(), relayer.toBase58());
+});
+

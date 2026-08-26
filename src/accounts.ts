@@ -1,5 +1,5 @@
 import { PublicKey, type Connection } from "@solana/web3.js";
-import { ACCOUNT_DISC } from "./constants.js";
+import { ACCOUNT_DISC, INTENTS_ACCOUNT_DISC, PAYMASTER_SPACE, SPEND_VAULT_SPACE } from "./constants.js";
 import { decodeLabel } from "./encode.js";
 
 export type DecodedGrokAccount = {
@@ -121,3 +121,87 @@ export async function fetchGrant(
   if (!info) return null;
   return decodeGrant(Buffer.from(info.data));
 }
+
+export type DecodedSpendVault = {
+  grok_account: string;
+  root: string;
+  bump: number;
+};
+
+export type DecodedPaymaster = {
+  grok_account: string;
+  root: string;
+  relayer: string;
+  bump: number;
+  paused: boolean;
+};
+
+export function decodeSpendVault(data: Buffer): DecodedSpendVault {
+  requireDisc(data, Buffer.from(INTENTS_ACCOUNT_DISC.SpendVault), "SpendVault");
+  let o = 8;
+  const grok_account = new PublicKey(data.subarray(o, o + 32));
+  o += 32;
+  const root = new PublicKey(data.subarray(o, o + 32));
+  o += 32;
+  const bump = data[o]!;
+  return {
+    grok_account: grok_account.toBase58(),
+    root: root.toBase58(),
+    bump,
+  };
+}
+
+export function decodePaymaster(data: Buffer): DecodedPaymaster {
+  requireDisc(data, Buffer.from(INTENTS_ACCOUNT_DISC.Paymaster), "Paymaster");
+  let o = 8;
+  const grok_account = new PublicKey(data.subarray(o, o + 32));
+  o += 32;
+  const root = new PublicKey(data.subarray(o, o + 32));
+  o += 32;
+  const relayer = new PublicKey(data.subarray(o, o + 32));
+  o += 32;
+  const bump = data[o]!;
+  o += 1;
+  const paused = data[o] !== 0;
+  return {
+    grok_account: grok_account.toBase58(),
+    root: root.toBase58(),
+    relayer: relayer.toBase58(),
+    bump,
+    paused,
+  };
+}
+
+export function spendableLamports(lamports: number, rentExemptMinimum: number): number {
+  return Math.max(0, lamports - rentExemptMinimum);
+}
+
+export async function fetchSpendVault(
+  connection: Connection,
+  address: PublicKey,
+): Promise<(DecodedSpendVault & { lamports: number }) | null> {
+  const info = await connection.getAccountInfo(address);
+  if (!info) return null;
+  return { ...decodeSpendVault(Buffer.from(info.data)), lamports: info.lamports };
+}
+
+export async function fetchPaymaster(
+  connection: Connection,
+  address: PublicKey,
+): Promise<(DecodedPaymaster & { lamports: number }) | null> {
+  const info = await connection.getAccountInfo(address);
+  if (!info) return null;
+  return { ...decodePaymaster(Buffer.from(info.data)), lamports: info.lamports };
+}
+
+export async function vaultRentMinimums(connection: Connection): Promise<{
+  spend_vault: number;
+  paymaster: number;
+}> {
+  const [spend_vault, paymaster] = await Promise.all([
+    connection.getMinimumBalanceForRentExemption(SPEND_VAULT_SPACE),
+    connection.getMinimumBalanceForRentExemption(PAYMASTER_SPACE),
+  ]);
+  return { spend_vault, paymaster };
+}
+

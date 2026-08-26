@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { SystemProgram } from "@solana/web3.js";
-import { PolicyError, rejectSecretFields, validateCheckGrant, validatePolicy } from "../src/policy.js";
+import { PolicyError, rejectSecretFields, validateCheckGrant, validatePay, validatePolicy } from "../src/policy.js";
 import { payTool } from "../src/tools/pay.js";
-import { LOCAL_ONLY_PROGRAM_ID } from "../src/constants.js";
+import { LOCAL_ONLY_INTENTS_PROGRAM_ID, LOCAL_ONLY_PROGRAM_ID, MAX_SPONSOR_LAMPORTS } from "../src/constants.js";
+import { swapTool } from "../src/tools/stubs.js";
 
 test("rejects expiry 0, expiry not in future, allowlist too long, duplicates", () => {
   const now = 1_700_000_000;
@@ -81,18 +82,50 @@ test("secret-named fields are rejected and not part of tool schemas", () => {
   assert.throws(() => rejectSecretFields({ keypair: "x" }));
 });
 
-test("pay is an honest stub and does not move SOL", async () => {
+test("pay client rejects amount 0 and sponsor over cap", async () => {
+  assert.throws(
+    () => validatePay({ amountLamports: 0n, sponsorLamports: 0n }),
+    (e: unknown) => e instanceof PolicyError && e.code === "ZeroPayAmount",
+  );
+  assert.throws(
+    () => validatePay({ amountLamports: 1n, sponsorLamports: BigInt(MAX_SPONSOR_LAMPORTS) + 1n }),
+    (e: unknown) => e instanceof PolicyError && e.code === "SponsorCapExceeded",
+  );
+  const zero = await payTool({
+    to: SystemProgram.programId.toBase58(),
+    amount_lamports: 0,
+  });
+  assert.equal(zero.status, "error");
+  assert.equal(zero.code, "ZeroPayAmount");
+  const over = await payTool({
+    to: SystemProgram.programId.toBase58(),
+    amount_lamports: 1,
+    sponsor_lamports: MAX_SPONSOR_LAMPORTS + 1,
+  });
+  assert.equal(over.status, "error");
+  assert.equal(over.code, "SponsorCapExceeded");
+});
+
+test("pay is implemented, not a stub; missing relayer is need_human_setup", async () => {
   const r = await payTool({
     to: SystemProgram.programId.toBase58(),
     amount_lamports: 1,
-    memo: "nope",
+    root: SystemProgram.programId.toBase58(),
   });
-  assert.equal(r.status, "stub");
-  assert.equal(r.moved_sol, false);
-  assert.match(String(r.reason), /PROGRAMS/);
-  assert.match(String(r.reason), /did not move SOL/);
+  assert.notEqual(r.status, "stub");
+  assert.equal(r.moved_sol ?? false, false);
+  assert.ok(r.status === "need_human_setup" || r.status === "need_human_signature" || r.status === "error");
+  assert.match(JSON.stringify(r), /HUMAN\.md|never holds SOL|RELAYER|AGENT/i);
 });
 
-test("local-only program id is the documented localnet default string", () => {
+test("swap is an honest IntentStub", async () => {
+  const r = await swapTool({});
+  assert.equal(r.status, "stub");
+  assert.equal(r.error, "IntentStub");
+  assert.equal(r.moved_sol, false);
+});
+
+test("local-only program ids are the documented localnet default strings", () => {
   assert.equal(LOCAL_ONLY_PROGRAM_ID, "8WDhHSfrz6hMkmX7WteAAmyuWFLryHM2Kfc1r4k8EFXE");
+  assert.equal(LOCAL_ONLY_INTENTS_PROGRAM_ID, "AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2");
 });

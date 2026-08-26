@@ -26,7 +26,7 @@ export type ToolResult = {
   error?: string;
   notes?: string[];
   human?: typeof HUMAN_MD;
-  moved_sol?: false;
+  moved_sol?: boolean;
   dry_run?: boolean;
   [key: string]: unknown;
 };

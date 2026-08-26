@@ -10,6 +10,7 @@ export type Ctx = {
   cfg: AppConfig;
   root: LoadedKey;
   agent: LoadedKey;
+  relayer: LoadedKey;
 };
 
 export function openCtx(args?: Record<string, unknown>): Ctx {
@@ -19,6 +20,7 @@ export function openCtx(args?: Record<string, unknown>): Ctx {
     cfg,
     root: loadKeyFromEnvPath("GROKCHAIN_ROOT_KEYPAIR"),
     agent: loadKeyFromEnvPath("GROKCHAIN_AGENT_KEYPAIR"),
+    relayer: loadKeyFromEnvPath("GROKCHAIN_RELAYER_KEYPAIR"),
   };
 }
 

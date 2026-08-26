@@ -37,7 +37,7 @@ export function loadKeypairFromPath(path: string): Keypair {
 }
 
 export function loadKeyFromEnvPath(
-  envName: "GROKCHAIN_ROOT_KEYPAIR" | "GROKCHAIN_AGENT_KEYPAIR",
+  envName: "GROKCHAIN_ROOT_KEYPAIR" | "GROKCHAIN_AGENT_KEYPAIR" | "GROKCHAIN_RELAYER_KEYPAIR",
   explicitPath?: string,
 ): LoadedKey {
   const path = (explicitPath ?? process.env[envName])?.trim();
@@ -76,10 +76,21 @@ export function defaultRootPath(): string {
   );
 }
 
+export function defaultRelayerPath(): string {
+  return (
+    process.env.GROKCHAIN_RELAYER_KEYPAIR?.trim() ||
+    `${homedir()}/.config/grokchain/relayer.json`
+  );
+}
+
 /**
  * Generate an agent keystore (Solana CLI JSON array), chmod 0600,
  * print/return pubkey only. Never serializes the secret to stdout.
  */
+export function initRelayerKeystore(outPath: string): PublicKey {
+  return initAgentKeystore(outPath);
+}
+
 export function initAgentKeystore(outPath: string): PublicKey {
   if (existsSync(outPath)) {
     throw new Error(

@@ -17,9 +17,12 @@ export type DispatchOpts = {
   ix: TransactionInstruction;
   feePayer: PublicKey;
   signer?: Keypair;
-  signerRole: "root" | "agent";
+  extraSigners?: Keypair[];
+  signerRole: "root" | "agent" | "relayer";
   dryRun?: boolean;
   extra: Record<string, unknown>;
+  /** When the required fee-payer/setup key is missing, return need_human_setup (not need_human_signature). */
+  setupReason?: string;
 };
 
 async function latestBlockhash(connection: Connection): Promise<string | null> {
@@ -38,12 +41,13 @@ function serializeUnsigned(tx: Transaction): string {
 }
 
 export async function dispatchIx(opts: DispatchOpts): Promise<ToolResult> {
-  const { cfg, ix, feePayer, signer, signerRole, dryRun, extra } = opts;
+  const { cfg, ix, feePayer, signer, extraSigners, signerRole, dryRun, extra, setupReason } = opts;
   const notes = [...clusterNotes(cfg), ...(Array.isArray(extra.notes) ? (extra.notes as string[]) : [])];
   const base: ToolResult = {
     status: "ok",
     cluster: cfg.cluster,
     program_id: cfg.programId.toBase58(),
+    intents_program_id: cfg.intentsProgramId.toBase58(),
     rpc_url: cfg.rpcUrl,
     ...extra,
     notes,
@@ -63,19 +67,25 @@ export async function dispatchIx(opts: DispatchOpts): Promise<ToolResult> {
 
   if (!signer) {
     const unsigned = serializeUnsigned(tx);
+    const status = setupReason ? "need_human_setup" : "need_human_signature";
+    const reason =
+      setupReason ??
+      `${signerRole} keypair path is missing. Do not ask the bot for a key. The human signs with their own wallet. See ${HUMAN_MD}.`;
     return {
       ...base,
-      status: dryRun ? "need_human_signature" : "need_human_signature",
+      status,
       unsigned_tx_base64: unsigned,
-      reason: `${signerRole} keypair path is missing. Do not ask the bot for a key. The human signs with their own wallet. See ${HUMAN_MD}.`,
+      reason,
       dry_run: dryRun,
       notes,
     };
   }
 
+  const signers = [signer, ...(extraSigners ?? [])];
+
   if (dryRun) {
     try {
-      tx.sign(signer);
+      tx.sign(...signers);
       const sim = await connection.simulateTransaction(tx);
       return {
         ...base,
@@ -99,7 +109,7 @@ export async function dispatchIx(opts: DispatchOpts): Promise<ToolResult> {
   }
 
   try {
-    const signature = await sendAndConfirmTransaction(connection, tx, [signer], {
+    const signature = await sendAndConfirmTransaction(connection, tx, signers, {
       commitment: "confirmed",
     });
     return {
@@ -115,7 +125,7 @@ export async function dispatchIx(opts: DispatchOpts): Promise<ToolResult> {
       error: e instanceof Error ? e.message : String(e),
       unsigned_tx_base64: serializeUnsigned(tx),
       reason:
-        "Send failed. If the local validator is not running the local-only CORE program, the ix will not land. See HUMAN.md.",
+        "Send failed. Local-only programs land only on a local validator running the matching CORE and INTENTS program ids. See HUMAN.md.",
       notes,
     };
   }
@@ -126,6 +136,7 @@ export function needHumanSetup(cfg: AppConfig, reason: string, extra: Record<str
     status: "need_human_setup",
     cluster: cfg.cluster,
     program_id: cfg.programId.toBase58(),
+    intents_program_id: cfg.intentsProgramId.toBase58(),
     rpc_url: cfg.rpcUrl,
     reason: `${reason} See ${HUMAN_MD}. Never ask the bot for a key.`,
     human: HUMAN_MD,

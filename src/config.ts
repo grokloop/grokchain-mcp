@@ -1,14 +1,17 @@
 import { Connection, PublicKey } from "@solana/web3.js";
-import { LOCAL_ONLY_PROGRAM_ID } from "./constants.js";
+import { LOCAL_ONLY_INTENTS_PROGRAM_ID, LOCAL_ONLY_PROGRAM_ID } from "./constants.js";
 import type { Cluster } from "./types.js";
 
 export type AppConfig = {
   cluster: Cluster;
   rpcUrl: string;
   programId: PublicKey;
+  intentsProgramId: PublicKey;
   rootKeypairPath?: string;
   agentKeypairPath?: string;
+  relayerKeypairPath?: string;
   localOnlyProgram: boolean;
+  localOnlyIntents: boolean;
 };
 
 const CLUSTERS: Cluster[] = ["localnet", "devnet", "mainnet-beta"];
@@ -24,6 +27,37 @@ function defaultRpc(cluster: Cluster): string {
   }
 }
 
+function resolveProgramId(opts: {
+  cluster: Cluster;
+  envName: string;
+  envValue: string | undefined;
+  localOnlyId: string;
+  label: string;
+}): { id: PublicKey; localOnly: boolean } {
+  const envProgram = opts.envValue?.trim();
+  let programIdStr: string;
+  if (envProgram) {
+    programIdStr = envProgram;
+  } else if (opts.cluster === "localnet") {
+    programIdStr = opts.localOnlyId;
+  } else {
+    throw new Error(
+      `${opts.envName} is required when cluster is not localnet. ${opts.label} is local-only today and is not deployed.`,
+    );
+  }
+
+  if (opts.cluster !== "localnet" && programIdStr === opts.localOnlyId) {
+    throw new Error(
+      `Refusing to use the local-only ${opts.label} program id on a non-localnet cluster. That id is not a deployed program.`,
+    );
+  }
+
+  return {
+    id: new PublicKey(programIdStr),
+    localOnly: opts.cluster === "localnet" && programIdStr === opts.localOnlyId,
+  };
+}
+
 export function loadConfig(): AppConfig {
   const raw = (process.env.GROKCHAIN_CLUSTER ?? "localnet").trim();
   if (!CLUSTERS.includes(raw as Cluster)) {
@@ -32,38 +66,33 @@ export function loadConfig(): AppConfig {
     );
   }
   const cluster = raw as Cluster;
-
   const rpcUrl = (process.env.GROKCHAIN_RPC_URL ?? defaultRpc(cluster)).trim();
-  const envProgram = process.env.GROKCHAIN_PROGRAM_ID?.trim();
 
-  let programIdStr: string;
-  if (envProgram) {
-    programIdStr = envProgram;
-  } else if (cluster === "localnet") {
-    programIdStr = LOCAL_ONLY_PROGRAM_ID;
-  } else {
-    throw new Error(
-      "GROKCHAIN_PROGRAM_ID is required when cluster is not localnet. CORE is local-only today and is not deployed.",
-    );
-  }
-
-  if (cluster !== "localnet" && programIdStr === LOCAL_ONLY_PROGRAM_ID) {
-    throw new Error(
-      "Refusing to use the local-only program id on a non-localnet cluster. That id is not a deployed program.",
-    );
-  }
-
-  const programId = new PublicKey(programIdStr);
-  const localOnlyProgram =
-    cluster === "localnet" && programIdStr === LOCAL_ONLY_PROGRAM_ID;
+  const core = resolveProgramId({
+    cluster,
+    envName: "GROKCHAIN_PROGRAM_ID",
+    envValue: process.env.GROKCHAIN_PROGRAM_ID,
+    localOnlyId: LOCAL_ONLY_PROGRAM_ID,
+    label: "CORE",
+  });
+  const intents = resolveProgramId({
+    cluster,
+    envName: "GROKCHAIN_INTENTS_PROGRAM_ID",
+    envValue: process.env.GROKCHAIN_INTENTS_PROGRAM_ID,
+    localOnlyId: LOCAL_ONLY_INTENTS_PROGRAM_ID,
+    label: "INTENTS",
+  });
 
   return {
     cluster,
     rpcUrl,
-    programId,
+    programId: core.id,
+    intentsProgramId: intents.id,
     rootKeypairPath: process.env.GROKCHAIN_ROOT_KEYPAIR?.trim() || undefined,
     agentKeypairPath: process.env.GROKCHAIN_AGENT_KEYPAIR?.trim() || undefined,
-    localOnlyProgram,
+    relayerKeypairPath: process.env.GROKCHAIN_RELAYER_KEYPAIR?.trim() || undefined,
+    localOnlyProgram: core.localOnly,
+    localOnlyIntents: intents.localOnly,
   };
 }
 
@@ -78,9 +107,19 @@ export function clusterNotes(cfg: AppConfig): string[] {
       "CORE is local-only today. This default program id is for a local validator only. It is not a deployed program.",
     );
   }
-  notes.push("Human pays gas. spend_cap_lamports is a counter, not a vault.");
+  if (cfg.localOnlyIntents) {
+    notes.push(
+      "INTENTS is local-only today. This default program id is for a local validator only. It is not a deployed program.",
+    );
+  }
   notes.push(
-    "sponsor_eligible is a stored hook only; this client does not sponsor gas.",
+    "Human funds SpendVault (pay source) AND Paymaster (gas). Two deposits. Human pays.",
+  );
+  notes.push(
+    "Relayer is the only address reimbursed as the outer fee payer. Bot/agent never holds SOL, never is the fee payer, never is the SOL source.",
+  );
+  notes.push(
+    "sponsor_eligible means this grant may use YOUR paymaster — not a promise Grok Chain pays.",
   );
   return notes;
 }

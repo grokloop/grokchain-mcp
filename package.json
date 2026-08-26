@@ -1,7 +1,7 @@
 {
   "name": "@grokchain/mcp",
   "version": "0.1.0",
-  "description": "Official Grok Chain MCP. Agents talk intents, never hold keys. CORE is local-only today.",
+  "description": "Official Grok Chain MCP. Agents talk intents, never hold keys. CORE and INTENTS are local-only today. Bot never holds SOL.",
   "type": "module",
   "license": "MIT",
   "bin": {

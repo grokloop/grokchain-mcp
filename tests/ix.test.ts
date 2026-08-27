@@ -8,7 +8,7 @@ import {
   LOCAL_ONLY_PROGRAM_ID,
   MAX_SPONSOR_LAMPORTS,
 } from "../src/constants.js";
-import { buildInitPaymasterIx, buildInitSpendVaultIx, buildPayIx } from "../src/intents.js";
+import { buildCallIx, buildDeployIx, buildInitPaymasterIx, buildInitSpendVaultIx, buildPayIx, buildSwapIx } from "../src/intents.js";
 import { grantPda, grokAccountPda, paymasterPda, spendVaultPda } from "../src/pda.js";
 import {
   buildCheckGrantIx,
@@ -17,7 +17,7 @@ import {
   buildReviseGrantIx,
   buildRevokeGrantIx,
 } from "../src/core.js";
-import { encodeGrantPolicyArgs, encodePayArgs } from "../src/encode.js";
+import { encodeCallArgs, encodeDeployArgs, encodeGrantPolicyArgs, encodePayArgs, encodeSwapArgs } from "../src/encode.js";
 
 const PROGRAM = new PublicKey(LOCAL_ONLY_PROGRAM_ID);
 const ROOT = new PublicKey("11111111111111111111111111111111");
@@ -199,3 +199,77 @@ test("vault init seeds and discriminators match spec", () => {
   assert.equal(new PublicKey(pm.ix.data.subarray(8, 40)).toBase58(), relayer.toBase58());
 });
 
+
+test("swap discriminator and SwapArgs are disc + 3 u64s; same mouth as pay", () => {
+  assert.deepEqual(Array.from(INTENTS_DISC.swap), [248, 198, 158, 145, 225, 117, 135, 200]);
+  const args = encodeSwapArgs({ amountInLamports: 100, minOutLamports: 90, sponsorLamports: 0 });
+  assert.equal(args.length, 24);
+  assert.equal(args.readBigUInt64LE(0), 100n);
+  assert.equal(args.readBigUInt64LE(8), 90n);
+  assert.equal(args.readBigUInt64LE(16), 0n);
+
+  const built = buildSwapIx({
+    coreProgramId: PROGRAM,
+    intentsProgramId: INTENTS,
+    root: ROOT,
+    agent: AGENT,
+    outDestination: SystemProgram.programId,
+    amountInLamports: 100,
+    minOutLamports: 90,
+    sponsorLamports: 0,
+  });
+  assert.equal(built.ix.data.length, 32);
+  assert.deepEqual(Array.from(built.ix.data.subarray(0, 8)), Array.from(INTENTS_DISC.swap));
+  assert.equal(built.ix.keys.length, 10);
+  assert.equal(built.ix.keys[0]!.pubkey.equals(AGENT), true);
+  assert.equal(built.ix.keys[0]!.isSigner, true);
+  assert.equal(built.ix.keys[0]!.isWritable, false);
+  assert.equal(built.ix.keys[6]!.isWritable, true);
+});
+
+test("deploy discriminator is disc + u64 + pubkey; spend_vault not writable", () => {
+  assert.deepEqual(Array.from(INTENTS_DISC.deploy), [67, 36, 143, 118, 36, 164, 92, 217]);
+  const args = encodeDeployArgs({ sponsorLamports: 0, programId: SystemProgram.programId });
+  assert.equal(args.length, 40);
+  const built = buildDeployIx({
+    coreProgramId: PROGRAM,
+    intentsProgramId: INTENTS,
+    root: ROOT,
+    agent: AGENT,
+    programId: SystemProgram.programId,
+    sponsorLamports: 0,
+  });
+  assert.equal(built.ix.data.length, 48);
+  assert.deepEqual(Array.from(built.ix.data.subarray(0, 8)), Array.from(INTENTS_DISC.deploy));
+  assert.equal(built.ix.keys.length, 9);
+  assert.equal(built.ix.keys[0]!.isSigner, true);
+  assert.equal(built.ix.keys[0]!.isWritable, false);
+  assert.equal(built.ix.keys[5]!.isWritable, false);
+});
+
+test("call discriminator is disc + 2 u64s + pubkey; amount 0 still builds", () => {
+  assert.deepEqual(Array.from(INTENTS_DISC.call), [181, 94, 56, 161, 194, 221, 200, 3]);
+  const args = encodeCallArgs({
+    amountLamports: 0,
+    sponsorLamports: 0,
+    targetProgram: SystemProgram.programId,
+  });
+  assert.equal(args.length, 48);
+  const built = buildCallIx({
+    coreProgramId: PROGRAM,
+    intentsProgramId: INTENTS,
+    root: ROOT,
+    agent: AGENT,
+    recipient: SystemProgram.programId,
+    targetProgram: SystemProgram.programId,
+    amountLamports: 0,
+    sponsorLamports: 0,
+  });
+  assert.equal(built.ix.data.length, 56);
+  assert.deepEqual(Array.from(built.ix.data.subarray(0, 8)), Array.from(INTENTS_DISC.call));
+  assert.equal(built.ix.data.readBigUInt64LE(8), 0n);
+  assert.equal(built.ix.keys.length, 11);
+  assert.equal(built.ix.keys[0]!.isSigner, true);
+  assert.equal(built.ix.keys[0]!.isWritable, false);
+  assert.equal(built.ix.keys[8]!.pubkey.equals(SystemProgram.programId), true);
+});

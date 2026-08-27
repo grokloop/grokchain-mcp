@@ -52,7 +52,7 @@ GROKCHAIN_CLUSTER=devnet GROKCHAIN_ROOT_KEYPAIR=$HOME/.config/solana/id.json gro
   - INTENTS `EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz`
     https://explorer.solana.com/address/EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz?cluster=devnet
 - Local-only ids `8WDhHSfrz6hMkmX7WteAAmyuWFLryHM2Kfc1r4k8EFXE` and `AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2` are refused on devnet.
-- `swap` / `deploy` / `call` still stub.
+- `swap` / `deploy` / `call` are implemented clients in this source. They were not upgraded on the grokchain-devnet INTENTS binary in this change. Do not claim they are live on public Solana.
 
 Long form (every step by hand): [HUMAN.md](./HUMAN.md).
 

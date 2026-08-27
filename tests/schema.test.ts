@@ -25,12 +25,17 @@ test("docs do not advertise either local-only id as a public deployment", () => 
   const files = [
     join(here, "../README.md"),
     join(here, "../HUMAN.md"),
+    join(here, "../GETTING-STARTED.md"),
     join(here, "../skills/grok-build/SKILL.md"),
     join(here, "../src/config.ts"),
     join(here, "../src/constants.ts"),
     join(here, "../src/cli.ts"),
     join(here, "../src/index.ts"),
     join(here, "../src/tools/pay.ts"),
+    join(here, "../src/tools/swap.ts"),
+    join(here, "../src/tools/deploy.ts"),
+    join(here, "../src/tools/call.ts"),
+    join(here, "../src/tools/agent_intent.ts"),
   ];
   const ids = [
     "8WDhHSfrz6hMkmX7WteAAmyuWFLryHM2Kfc1r4k8EFXE",

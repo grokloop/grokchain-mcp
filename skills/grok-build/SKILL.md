@@ -19,7 +19,9 @@ Use these names. Do not drop to raw Solana unless the human asked you to debug.
 | `revoke_grant` | human root | Mark the grant revoked |
 | `check_grant` | agent | Consume path. Increments `spent_lamports`. Does not move SOL. |
 | `pay` | agent signs; relayer fee-pays | **Implemented** INTENTS client. localnet: local-only INTENTS id. **devnet**: grokchain-devnet INTENTS id. Human-funded SpendVault → recipient. Bot never holds SOL. |
-| `swap` / `deploy` / `call` | — | **Stub** (`IntentStub`). Do not pretend to DEX or deploy. |
+| `swap` | agent signs; relayer fee-pays | Grant-gated SOL send with min_out. Not a DEX. Not Jupiter. Not SPL. |
+| `deploy` | agent signs; relayer fee-pays | check_grant(0) + DeployRequested. Not a BPF deploy. No ELF. |
+| `call` | agent signs; relayer fee-pays | Grant-gated router. amount 0 = policy ping. CORE allowlists INTENTS, not the inner target. |
 | `get_account` / `get_grant` | none | Optional reads |
 
 ## CORE + INTENTS by cluster
@@ -33,7 +35,7 @@ Use these names. Do not drop to raw Solana unless the human asked you to debug.
 
 On **devnet**, `create_account` / `issue_grant` / `revise_grant` / `revoke_grant` / `check_grant` and `pay` / vaults are implemented clients against the real deployed ids. They land only if the human has rooted the account, issued a grant allowlisting the **devnet INTENTS** id `EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz`, funded SpendVault + Paymaster, and set `GROKCHAIN_RELAYER_KEYPAIR`. Otherwise `need_human_signature` / `need_human_setup`. Do not fake a send.
 
-`swap` / `deploy` / `call` still stub.
+`swap` / `deploy` / `call` are implemented clients in this source. They were not upgraded on the grokchain-devnet INTENTS binary in this change. Do not claim those ixs are live on public Solana. Do not pretend swap is a DEX or deploy uploaded an ELF.
 
 ## Devnet
 
@@ -67,7 +69,7 @@ Env vars name **paths**, not secrets:
 - Vault init/fund/withdraw, `paymaster init` / `fund` / `set-relayer` / pause need the **human root**.
 - `check_grant` is the **agent** consume path. Agent does not sign `issue_grant`.
 - `pay` is implemented. Agent signs the intent. Relayer is the outer fee payer. Do not send a system transfer and call it `pay`.
-- `swap` / `deploy` / `call` are stubs (`IntentStub`).
+- `swap` is a grant-gated SOL send (not a DEX). `deploy` is a request event (not a BPF deploy). `call` is a grant-gated router (amount 0 = policy ping). Not upgraded on grokchain-devnet in this change.
 
 ## Policy you must respect
 

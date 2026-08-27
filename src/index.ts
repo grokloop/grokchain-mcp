@@ -7,7 +7,9 @@ import { checkGrantTool } from "./tools/check_grant.js";
 import { createAccountTool } from "./tools/create_account.js";
 import { issueGrantTool } from "./tools/issue_grant.js";
 import { payTool } from "./tools/pay.js";
-import { callTool, deployTool, swapTool } from "./tools/stubs.js";
+import { callTool } from "./tools/call.js";
+import { deployTool } from "./tools/deploy.js";
+import { swapTool } from "./tools/swap.js";
 import { getAccountTool, getGrantTool } from "./tools/reads.js";
 import { reviseGrantTool } from "./tools/revise_grant.js";
 import { revokeGrantTool } from "./tools/revoke_grant.js";
@@ -117,22 +119,57 @@ function buildServer(): McpServer {
 
   server.tool(
     "swap",
-    "Honest STUB. INTENTS swap returns IntentStub. Not implemented. Does not call a DEX.",
-    {},
+    "Implemented INTENTS swap. Grant-gated SOL send with min_out. Not a DEX. Not Jupiter. Not SPL. Agent signs. Relayer fee-pays. Bot never holds SOL. Lands on localnet only if the local validator is running this binary. This source was not upgraded on grokchain-devnet — do not claim the new ix is live on public Solana.",
+    {
+      to: pubkey.describe("out_destination pubkey (SOL credit)"),
+      amount_in_lamports: z
+        .union([z.number().int().positive(), z.string()])
+        .describe("Lamports to send from SpendVault. Must be > 0."),
+      min_out_lamports: z
+        .union([z.number().int().nonnegative(), z.string()])
+        .optional()
+        .describe("Require amount_in >= min_out. Honest min check, not an AMM quote. Defaults to amount_in."),
+      sponsor_lamports: z
+        .union([z.number().int().nonnegative(), z.string()])
+        .optional()
+        .describe("Optional reimbursement to the relayer from YOUR paymaster. 0 = none. Max 10000000."),
+      root: pubkey.optional(),
+      dry_run: z.boolean().optional(),
+    },
     async (args) => jsonResult(await swapTool(args)),
   );
 
   server.tool(
     "deploy",
-    "Honest STUB. INTENTS deploy returns IntentStub. Not implemented.",
-    {},
+    "Implemented INTENTS deploy request. check_grant(0) + DeployRequested event. NOT a BPF deploy. No ELF uploaded. Agent signs. Relayer fee-pays. Bot never holds SOL. Not upgraded on grokchain-devnet in this change.",
+    {
+      program_id: pubkey.describe("Requested program id recorded in DeployRequested. Not deployed."),
+      sponsor_lamports: z
+        .union([z.number().int().nonnegative(), z.string()])
+        .optional(),
+      root: pubkey.optional(),
+      dry_run: z.boolean().optional(),
+    },
     async (args) => jsonResult(await deployTool(args)),
   );
 
   server.tool(
     "call",
-    "Honest STUB. INTENTS call returns IntentStub. Not implemented.",
-    {},
+    "Implemented INTENTS call. Grant-gated router. amount 0 = policy ping (no vault debit). amount > 0 debits SpendVault. remaining_accounts empty = grant-checked only. CORE allowlists INTENTS, not the inner target. Not upgraded on grokchain-devnet in this change.",
+    {
+      target_program: pubkey.describe("Inner program remaining_accounts are invoked into. CORE still allowlists INTENTS."),
+      amount_lamports: lamports.optional().describe("0 = policy ping. >0 debits SpendVault to `to`."),
+      to: pubkey.optional().describe("Recipient when amount_lamports > 0. Defaults to target_program."),
+      sponsor_lamports: z
+        .union([z.number().int().nonnegative(), z.string()])
+        .optional(),
+      remaining_accounts: z
+        .array(z.union([pubkey, z.object({ pubkey, isSigner: z.boolean().optional(), isWritable: z.boolean().optional() })]))
+        .optional()
+        .describe("Empty = policy ping. Non-empty invokes target with empty ix data. Do not pass spend_vault or paymaster."),
+      root: pubkey.optional(),
+      dry_run: z.boolean().optional(),
+    },
     async (args) => jsonResult(await callTool(args)),
   );
 

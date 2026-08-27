@@ -5,7 +5,7 @@ import {
   type AccountMeta,
 } from "@solana/web3.js";
 import { INTENTS_DISC } from "./constants.js";
-import { encodePayArgs, encodePubkey, encodeU64 } from "./encode.js";
+import { encodeCallArgs, encodeDeployArgs, encodePayArgs, encodePubkey, encodeSwapArgs, encodeU64 } from "./encode.js";
 import { grantPda, grokAccountPda, paymasterPda, spendVaultPda } from "./pda.js";
 
 function meta(pubkey: PublicKey, isSigner: boolean, isWritable: boolean): AccountMeta {
@@ -279,16 +279,169 @@ export function buildPayIx(opts: {
   };
 }
 
-export function buildStubIntentIx(opts: {
+function sponsorKeys(opts: {
   intentsProgramId: PublicKey;
-  agent: PublicKey;
-  kind: "swap" | "deploy" | "call";
-}): { ix: TransactionInstruction } {
+  paymaster: PublicKey;
+  sponsorLamports: bigint | number | string;
+  feePayer?: PublicKey;
+}): { paymasterKey: PublicKey; feePayerKey: PublicKey; feePayerSigner: boolean } {
+  const sponsor = BigInt(opts.sponsorLamports);
+  const dummy = opts.intentsProgramId;
   return {
+    paymasterKey: sponsor > 0n ? opts.paymaster : dummy,
+    feePayerKey: sponsor > 0n ? (opts.feePayer ?? dummy) : dummy,
+    feePayerSigner: sponsor > 0n && !!opts.feePayer,
+  };
+}
+
+/** SPEC swap metas: pay shape with out_destination. */
+export function buildSwapIx(opts: {
+  coreProgramId: PublicKey;
+  intentsProgramId: PublicKey;
+  root: PublicKey;
+  agent: PublicKey;
+  outDestination: PublicKey;
+  amountInLamports: bigint | number | string;
+  minOutLamports: bigint | number | string;
+  sponsorLamports: bigint | number | string;
+  feePayer?: PublicKey;
+}): { ix: TransactionInstruction } & VaultAddrs {
+  const addrs = deriveIntentsAddrs({ ...opts, agent: opts.agent });
+  const sk = sponsorKeys({
+    intentsProgramId: opts.intentsProgramId,
+    paymaster: addrs.paymaster,
+    sponsorLamports: opts.sponsorLamports,
+    feePayer: opts.feePayer,
+  });
+  const keys: AccountMeta[] = [
+    meta(opts.agent, true, false),
+    meta(addrs.grokAccount, false, false),
+    meta(addrs.grant, false, true),
+    meta(opts.coreProgramId, false, false),
+    meta(opts.intentsProgramId, false, false),
+    meta(addrs.spendVault, false, true),
+    meta(opts.outDestination, false, true),
+    meta(SystemProgram.programId, false, false),
+    meta(sk.paymasterKey, false, true),
+    meta(sk.feePayerKey, sk.feePayerSigner, true),
+  ];
+  const data = Buffer.concat([
+    Buffer.from(INTENTS_DISC.swap),
+    encodeSwapArgs({
+      amountInLamports: opts.amountInLamports,
+      minOutLamports: opts.minOutLamports,
+      sponsorLamports: opts.sponsorLamports,
+    }),
+  ]);
+  return {
+    ...addrs,
     ix: new TransactionInstruction({
       programId: opts.intentsProgramId,
-      keys: [meta(opts.agent, true, false)],
-      data: Buffer.from(INTENTS_DISC[opts.kind]),
+      keys,
+      data,
     }),
   };
+}
+
+/** SPEC deploy metas. spend_vault is present and not writable. */
+export function buildDeployIx(opts: {
+  coreProgramId: PublicKey;
+  intentsProgramId: PublicKey;
+  root: PublicKey;
+  agent: PublicKey;
+  programId: PublicKey;
+  sponsorLamports: bigint | number | string;
+  feePayer?: PublicKey;
+}): { ix: TransactionInstruction } & VaultAddrs {
+  const addrs = deriveIntentsAddrs({ ...opts, agent: opts.agent });
+  const sk = sponsorKeys({
+    intentsProgramId: opts.intentsProgramId,
+    paymaster: addrs.paymaster,
+    sponsorLamports: opts.sponsorLamports,
+    feePayer: opts.feePayer,
+  });
+  const keys: AccountMeta[] = [
+    meta(opts.agent, true, false),
+    meta(addrs.grokAccount, false, false),
+    meta(addrs.grant, false, true),
+    meta(opts.coreProgramId, false, false),
+    meta(opts.intentsProgramId, false, false),
+    meta(addrs.spendVault, false, false),
+    meta(SystemProgram.programId, false, false),
+    meta(sk.paymasterKey, false, true),
+    meta(sk.feePayerKey, sk.feePayerSigner, true),
+  ];
+  const data = Buffer.concat([
+    Buffer.from(INTENTS_DISC.deploy),
+    encodeDeployArgs({
+      sponsorLamports: opts.sponsorLamports,
+      programId: opts.programId,
+    }),
+  ]);
+  return {
+    ...addrs,
+    ix: new TransactionInstruction({
+      programId: opts.intentsProgramId,
+      keys,
+      data,
+    }),
+  };
+}
+
+/** SPEC call metas + optional remaining_accounts. */
+export function buildCallIx(opts: {
+  coreProgramId: PublicKey;
+  intentsProgramId: PublicKey;
+  root: PublicKey;
+  agent: PublicKey;
+  recipient: PublicKey;
+  targetProgram: PublicKey;
+  amountLamports: bigint | number | string;
+  sponsorLamports: bigint | number | string;
+  feePayer?: PublicKey;
+  remainingAccounts?: AccountMeta[];
+}): { ix: TransactionInstruction } & VaultAddrs {
+  const addrs = deriveIntentsAddrs({ ...opts, agent: opts.agent });
+  const sk = sponsorKeys({
+    intentsProgramId: opts.intentsProgramId,
+    paymaster: addrs.paymaster,
+    sponsorLamports: opts.sponsorLamports,
+    feePayer: opts.feePayer,
+  });
+  const keys: AccountMeta[] = [
+    meta(opts.agent, true, false),
+    meta(addrs.grokAccount, false, false),
+    meta(addrs.grant, false, true),
+    meta(opts.coreProgramId, false, false),
+    meta(opts.intentsProgramId, false, false),
+    meta(addrs.spendVault, false, true),
+    meta(opts.recipient, false, true),
+    meta(SystemProgram.programId, false, false),
+    meta(opts.targetProgram, false, false),
+    meta(sk.paymasterKey, false, true),
+    meta(sk.feePayerKey, sk.feePayerSigner, true),
+    ...prependTargetForInvoke(opts.targetProgram, opts.remainingAccounts ?? []),
+  ];
+  const data = Buffer.concat([
+    Buffer.from(INTENTS_DISC.call),
+    encodeCallArgs({
+      amountLamports: opts.amountLamports,
+      sponsorLamports: opts.sponsorLamports,
+      targetProgram: opts.targetProgram,
+    }),
+  ]);
+  return {
+    ...addrs,
+    ix: new TransactionInstruction({
+      programId: opts.intentsProgramId,
+      keys,
+      data,
+    }),
+  };
+}
+
+function prependTargetForInvoke(target: PublicKey, remaining: AccountMeta[]): AccountMeta[] {
+  if (remaining.length === 0) return [];
+  if (remaining.some((a) => a.pubkey.equals(target))) return remaining;
+  return [meta(target, false, false), ...remaining];
 }

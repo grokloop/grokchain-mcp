@@ -119,6 +119,77 @@ export function validatePay(args: {
   return { warnings };
 }
 
+export function validateSwap(args: {
+  amountInLamports: bigint;
+  minOutLamports: bigint;
+  sponsorLamports: bigint;
+}): { warnings: string[] } {
+  if (args.amountInLamports <= 0n) {
+    throw new PolicyError(
+      "ZeroAmount",
+      "swap amount_in_lamports must be greater than zero",
+    );
+  }
+  if (args.amountInLamports < args.minOutLamports) {
+    throw new PolicyError(
+      "MinOutNotMet",
+      "swap amount_in_lamports is below min_out_lamports",
+    );
+  }
+  if (args.sponsorLamports > BigInt(MAX_SPONSOR_LAMPORTS)) {
+    throw new PolicyError(
+      "SponsorCapExceeded",
+      `sponsor_lamports exceeds MAX_SPONSOR_LAMPORTS (${MAX_SPONSOR_LAMPORTS})`,
+    );
+  }
+  return {
+    warnings: [
+      "v1 swap is a grant-gated SOL send with a min_out check. Not a DEX. Not Jupiter. Not SPL.",
+      "Agent signs. Relayer is the outer fee payer. Bot never holds SOL.",
+      "This source was not upgraded on grokchain-devnet in this change. Lands on localnet only if the local validator is running this binary.",
+    ],
+  };
+}
+
+export function validateCall(args: {
+  amountLamports: bigint;
+  sponsorLamports: bigint;
+}): { warnings: string[] } {
+  // amount 0 is a policy ping
+  if (args.sponsorLamports > BigInt(MAX_SPONSOR_LAMPORTS)) {
+    throw new PolicyError(
+      "SponsorCapExceeded",
+      `sponsor_lamports exceeds MAX_SPONSOR_LAMPORTS (${MAX_SPONSOR_LAMPORTS})`,
+    );
+  }
+  return {
+    warnings: [
+      "v1 call is a grant-gated router. CORE allowlists INTENTS, not the inner target.",
+      args.amountLamports === 0n
+        ? "amount_lamports=0 is a policy ping: check_grant(0), no vault debit."
+        : "amount_lamports>0 debits SpendVault to the recipient after check_grant.",
+      "remaining_accounts empty = grant-checked only. Non-empty invokes the target with empty ix data.",
+      "This source was not upgraded on grokchain-devnet in this change.",
+    ],
+  };
+}
+
+export function validateDeploy(args: { sponsorLamports: bigint }): { warnings: string[] } {
+  if (args.sponsorLamports > BigInt(MAX_SPONSOR_LAMPORTS)) {
+    throw new PolicyError(
+      "SponsorCapExceeded",
+      `sponsor_lamports exceeds MAX_SPONSOR_LAMPORTS (${MAX_SPONSOR_LAMPORTS})`,
+    );
+  }
+  return {
+    warnings: [
+      "v1 deploy is a grant-gated request (check_grant(0) + DeployRequested). Not a BPF deploy. No ELF.",
+      "Agent signs. Relayer is the outer fee payer. Bot never holds SOL.",
+      "This source was not upgraded on grokchain-devnet in this change.",
+    ],
+  };
+}
+
 export function toBigInt(v: number | string, label: string): bigint {
   try {
     const n = BigInt(v);

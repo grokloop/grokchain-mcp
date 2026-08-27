@@ -33,7 +33,9 @@ Chain pays.
 | check_grant | implemented CORE client. Same cluster split. |
 | pay | implemented INTENTS client. **devnet**: real grokchain-devnet INTENTS id. localnet: local-only INTENTS id. Relayer fee-pays. Human-funded vaults. Lands only if the human has rooted the account, issued a grant allowlisting the cluster INTENTS id, funded SpendVault + Paymaster, and set RELAYER_KEYPAIR. Otherwise need_human_signature / need_human_setup. Do not fake a send. |
 | vault / paymaster CLI | implemented INTENTS client (same ids as pay). Root-signed. Human funds. |
-| swap / deploy / call | stub (IntentStub) |
+| swap | implemented INTENTS client. Grant-gated SOL send with min_out. Not a DEX. localnet: local-only INTENTS id (lands only if that validator runs this binary). Not upgraded on grokchain-devnet in this change — do not claim the new ix is live on public Solana. |
+| deploy | implemented INTENTS client. check_grant(0) + DeployRequested. Not a BPF deploy. No ELF. Same cluster honesty as swap. |
+| call | implemented INTENTS client. amount 0 = policy ping. amount > 0 debits SpendVault. remaining empty = grant-checked only. CORE allowlists INTENTS, not the inner target. Same cluster honesty as swap. |
 
 Optional read-only: get_account, get_grant.
 
@@ -67,14 +69,14 @@ implemented clients against the real deployed ids. They land only if the human
 has rooted the account, issued a grant allowlisting the **devnet INTENTS** id
 `EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz`, funded SpendVault + Paymaster,
 and set RELAYER_KEYPAIR. Otherwise need_human_signature / need_human_setup.
-swap/deploy/call still stub.
+swap/deploy/call are implemented clients in this source. They were not upgraded on the grokchain-devnet INTENTS binary in this change. Do not claim those ixs are live on public Solana.
 
 
 ## One command (devnet)
 
 See [GETTING-STARTED.md](./GETTING-STARTED.md). Human wallet is the only secret they keep.
 Agent and relayer are host files mode 0600. Relayer pays fees. Human funds vaults.
-Bot never holds SOL. CORE/INTENTS ids are the real devnet ones. swap/deploy/call still stub.
+Bot never holds SOL. CORE/INTENTS ids are the real devnet ones. swap/deploy/call are implemented clients in this source. They were not upgraded on the grokchain-devnet INTENTS binary in this change. Do not claim those ixs are live on public Solana.
 
 ```bash
 export GROKCHAIN_ROOT_KEYPAIR=$HOME/.config/solana/id.json

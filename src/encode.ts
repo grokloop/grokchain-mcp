@@ -80,3 +80,37 @@ export function encodePubkey(key: PublicKey): Buffer {
   return Buffer.from(key.toBuffer());
 }
 
+/** Borsh SwapArgs: u64 amount_in + u64 min_out + u64 sponsor */
+export function encodeSwapArgs(args: {
+  amountInLamports: bigint | number | string;
+  minOutLamports: bigint | number | string;
+  sponsorLamports: bigint | number | string;
+}): Buffer {
+  return Buffer.concat([
+    encodeU64(args.amountInLamports),
+    encodeU64(args.minOutLamports),
+    encodeU64(args.sponsorLamports),
+  ]);
+}
+
+/** Borsh DeployArgs: u64 sponsor + Pubkey program_id */
+export function encodeDeployArgs(args: {
+  sponsorLamports: bigint | number | string;
+  programId: PublicKey;
+}): Buffer {
+  return Buffer.concat([encodeU64(args.sponsorLamports), encodePubkey(args.programId)]);
+}
+
+/** Borsh CallArgs: u64 amount + u64 sponsor + Pubkey target_program */
+export function encodeCallArgs(args: {
+  amountLamports: bigint | number | string;
+  sponsorLamports: bigint | number | string;
+  targetProgram: PublicKey;
+}): Buffer {
+  return Buffer.concat([
+    encodeU64(args.amountLamports),
+    encodeU64(args.sponsorLamports),
+    encodePubkey(args.targetProgram),
+  ]);
+}
+

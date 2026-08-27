@@ -22,7 +22,7 @@ Human funds **two** vaults: SpendVault (pay source) and Paymaster (gas). Two dep
 
 Grant allowlist is **router mode**: allowlist the INTENTS program id for this cluster, not SystemProgram and not every inner DEX.
 
-On **devnet**, create/issue/revise/revoke/check_grant and pay/vaults are implemented clients against the real deployed ids. They land only if the human has rooted the account, issued a grant allowlisting the **devnet INTENTS** id `EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz`, funded SpendVault + Paymaster, and set `GROKCHAIN_RELAYER_KEYPAIR`. Otherwise `need_human_signature` / `need_human_setup`. `swap` / `deploy` / `call` still stub.
+On **devnet**, create/issue/revise/revoke/check_grant and pay/vaults are implemented clients against the real deployed ids. They land only if the human has rooted the account, issued a grant allowlisting the **devnet INTENTS** id `EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz`, funded SpendVault + Paymaster, and set `GROKCHAIN_RELAYER_KEYPAIR`. Otherwise `need_human_signature` / `need_human_setup`. `swap` / `deploy` / `call` are implemented clients in this source (grant-gated SOL send / deploy request / router call). They were not upgraded on the grokchain-devnet INTENTS binary in this change. Do not treat those ixs as live on public Solana until an explicit upgrade.
 
 ## 1. Install Solana CLI. Use your own wallet.
 
@@ -204,6 +204,6 @@ Cursor / MCP host config (stdio). Point env at **paths**:
 
 For localnet, set `GROKCHAIN_CLUSTER` to `localnet` and `GROKCHAIN_RPC_URL` to `http://127.0.0.1:8899`.
 
-`create_account` / `issue_grant` / `revise_grant` / `revoke_grant` still need the human root. `pay` is implemented against INTENTS: the agent signs, the relayer is the fee payer, SpendVault is the SOL source. The bot never holds SOL. `swap` / `deploy` / `call` are honest stubs (`IntentStub`).
+`create_account` / `issue_grant` / `revise_grant` / `revoke_grant` still need the human root. `pay` / `swap` / `deploy` / `call` are implemented against INTENTS: the agent signs, the relayer is the fee payer, SpendVault is the SOL source when amount > 0. The bot never holds SOL. v1 swap is a grant-gated SOL send (not a DEX). v1 deploy is a request event (not a BPF deploy). v1 call is a grant-gated router (amount 0 = policy ping). This source was not upgraded on grokchain-devnet in the swap/deploy/call change.
 
 If a required keypair path is missing, or vaults / paymaster / grant are not set up, the tool returns `need_human_signature` or `need_human_setup` with an unsigned tx (base64) and a pointer back here. Never paste a seed into the bot. Never ask the bot for a key.

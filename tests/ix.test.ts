@@ -7,9 +7,11 @@ import {
   LOCAL_ONLY_INTENTS_PROGRAM_ID,
   LOCAL_ONLY_PROGRAM_ID,
   MAX_SPONSOR_LAMPORTS,
+  PUMP_DISC,
+  PUMP_PROGRAM_ID,
 } from "../src/constants.js";
-import { buildCallIx, buildDeployIx, buildInitPaymasterIx, buildInitSpendVaultIx, buildPayIx, buildSwapIx } from "../src/intents.js";
-import { grantPda, grokAccountPda, paymasterPda, spendVaultPda } from "../src/pda.js";
+import { buildCallIx, buildDeployIx, buildInitPaymasterIx, buildInitSpendVaultIx, buildPayIx, buildPumpBuyIx, buildPumpSellIx, buildSwapIx } from "../src/intents.js";
+import { grantPda, grokAccountPda, paymasterPda, pumpTraderPda, spendVaultPda } from "../src/pda.js";
 import {
   buildCheckGrantIx,
   buildCreateAccountIx,
@@ -17,7 +19,7 @@ import {
   buildReviseGrantIx,
   buildRevokeGrantIx,
 } from "../src/core.js";
-import { encodeCallArgs, encodeDeployArgs, encodeGrantPolicyArgs, encodePayArgs, encodeSwapArgs } from "../src/encode.js";
+import { encodeCallArgs, encodeDeployArgs, encodeGrantPolicyArgs, encodePayArgs, encodePumpBuyArgs, encodePumpBuyV2Inner, encodePumpSellArgs, encodeSwapArgs } from "../src/encode.js";
 
 const PROGRAM = new PublicKey(LOCAL_ONLY_PROGRAM_ID);
 const ROOT = new PublicKey("11111111111111111111111111111111");
@@ -272,4 +274,115 @@ test("call discriminator is disc + 2 u64s + pubkey; amount 0 still builds", () =
   assert.equal(built.ix.keys[0]!.isSigner, true);
   assert.equal(built.ix.keys[0]!.isWritable, false);
   assert.equal(built.ix.keys[8]!.pubkey.equals(SystemProgram.programId), true);
+});
+
+test("official pump discs match sha256(global:buy_v2/sell_v2)[:8]", () => {
+  assert.deepEqual(Array.from(PUMP_DISC.buy_v2), [0xb8, 0x17, 0xee, 0x61, 0x67, 0xc5, 0xd3, 0x3d]);
+  assert.deepEqual(Array.from(PUMP_DISC.sell_v2), [0x5d, 0xf6, 0x82, 0x3c, 0xe7, 0xe9, 0x40, 0xb2]);
+  const inner = encodePumpBuyV2Inner(1_000_000, 10_000_000);
+  assert.equal(inner.length, 24);
+  assert.deepEqual(Array.from(inner.subarray(0, 8)), Array.from(PUMP_DISC.buy_v2));
+  assert.notEqual(inner.length, 0);
+});
+
+test("pump_buy discriminator and args; user must be trader; target != pump fails", () => {
+  assert.deepEqual(Array.from(INTENTS_DISC.pump_buy), [82, 225, 119, 231, 78, 29, 45, 70]);
+  assert.deepEqual(Array.from(INTENTS_DISC.pump_sell), [93, 88, 60, 34, 91, 18, 86, 197]);
+  const args = encodePumpBuyArgs({ amount: 10, maxSolCost: 100, sponsorLamports: 0 });
+  assert.equal(args.length, 24);
+  const sellArgs = encodePumpSellArgs({ amount: 10, minSolOutput: 1, sponsorLamports: 0 });
+  assert.equal(sellArgs.length, 24);
+
+  const [grokAccount] = grokAccountPda(PROGRAM, ROOT);
+  const [spendVault] = spendVaultPda(INTENTS, grokAccount);
+  const [pumpTrader] = pumpTraderPda(INTENTS, grokAccount);
+  const pump = new PublicKey(PUMP_PROGRAM_ID);
+  const remaining = Array.from({ length: 27 }, (_, i) => ({
+    pubkey: i === 13 ? pumpTrader : i === 26 ? pump : new PublicKey("11111111111111111111111111111111"),
+    isSigner: false,
+    isWritable: i === 13,
+  }));
+
+
+  const vaultAsUser = remaining.map((a, i) => (i === 13 ? { ...a, pubkey: spendVault } : a));
+  assert.throws(
+    () =>
+      buildPumpBuyIx({
+        coreProgramId: PROGRAM,
+        intentsProgramId: INTENTS,
+        root: ROOT,
+        agent: AGENT,
+        amount: 10,
+        maxSolCost: 100,
+        sponsorLamports: 0,
+        remainingAccounts: vaultAsUser,
+      }),
+    /SpendVault|trader/,
+  );
+
+  const built = buildPumpBuyIx({
+    coreProgramId: PROGRAM,
+    intentsProgramId: INTENTS,
+    root: ROOT,
+    agent: AGENT,
+    amount: 10,
+    maxSolCost: 100,
+    sponsorLamports: 0,
+    remainingAccounts: remaining,
+  });
+  assert.equal(built.ix.data.length, 32);
+  assert.deepEqual(Array.from(built.ix.data.subarray(0, 8)), Array.from(INTENTS_DISC.pump_buy));
+  assert.equal(built.ix.keys[0]!.pubkey.equals(AGENT), true);
+  assert.equal(built.ix.keys[0]!.isSigner, true);
+  assert.equal(built.ix.keys[0]!.isWritable, false);
+  assert.equal(built.ix.keys[8]!.pubkey.equals(pump), true);
+
+  const badUser = remaining.map((a, i) => (i === 13 ? { ...a, pubkey: AGENT } : a));
+  assert.throws(
+    () =>
+      buildPumpBuyIx({
+        coreProgramId: PROGRAM,
+        intentsProgramId: INTENTS,
+        root: ROOT,
+        agent: AGENT,
+        amount: 10,
+        maxSolCost: 100,
+        sponsorLamports: 0,
+        remainingAccounts: badUser,
+      }),
+    /user/,
+  );
+
+  const badProg = remaining.map((a, i) => (i === 26 ? { ...a, pubkey: SystemProgram.programId } : a));
+  assert.throws(
+    () =>
+      buildPumpBuyIx({
+        coreProgramId: PROGRAM,
+        intentsProgramId: INTENTS,
+        root: ROOT,
+        agent: AGENT,
+        amount: 10,
+        maxSolCost: 100,
+        sponsorLamports: 0,
+        remainingAccounts: badProg,
+      }),
+    /pump\.fun/,
+  );
+
+  const sellRemaining = Array.from({ length: 26 }, (_, i) => ({
+    pubkey: i === 13 ? pumpTrader : i === 25 ? pump : new PublicKey("11111111111111111111111111111111"),
+    isSigner: false,
+    isWritable: i === 13,
+  }));
+  const sold = buildPumpSellIx({
+    coreProgramId: PROGRAM,
+    intentsProgramId: INTENTS,
+    root: ROOT,
+    agent: AGENT,
+    amount: 10,
+    minSolOutput: 1,
+    sponsorLamports: 0,
+    remainingAccounts: sellRemaining,
+  });
+  assert.deepEqual(Array.from(sold.ix.data.subarray(0, 8)), Array.from(INTENTS_DISC.pump_sell));
 });

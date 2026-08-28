@@ -1,5 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
-import { FORBIDDEN_SECRET_FIELDS, MAX_ALLOWED_PROGRAMS, MAX_SPONSOR_LAMPORTS } from "./constants.js";
+import { FORBIDDEN_SECRET_FIELDS, MAX_ALLOWED_PROGRAMS, MAX_SPONSOR_LAMPORTS, PUMP_CREATE_NAME_MAX, PUMP_CREATE_SYMBOL_MAX, PUMP_CREATE_URI_MAX } from "./constants.js";
 
 export class PolicyError extends Error {
   code: string;
@@ -207,3 +207,94 @@ export function toUnix(v: number | string, label: string): number {
   }
   return n;
 }
+
+export function validatePumpBuy(args: {
+  amount: bigint;
+  maxSolCost: bigint;
+  sponsorLamports: bigint;
+}): { warnings: string[] } {
+  if (args.amount <= 0n) {
+    throw new PolicyError("ZeroAmount", "pump_buy amount (base tokens) must be greater than zero");
+  }
+  if (args.maxSolCost <= 0n) {
+    throw new PolicyError("ZeroAmount", "pump_buy max_sol_cost must be greater than zero (grant SOL budget)");
+  }
+  if (args.sponsorLamports > BigInt(MAX_SPONSOR_LAMPORTS)) {
+    throw new PolicyError(
+      "SponsorCapExceeded",
+      `sponsor_lamports exceeds MAX_SPONSOR_LAMPORTS (${MAX_SPONSOR_LAMPORTS})`,
+    );
+  }
+  return {
+    warnings: [
+      "pump_buy is a tight INTENTS adapter for official pump.fun buy_v2. Not a general router. Not Jupiter.",
+      "Grant cap is max_sol_cost (SOL spent). Pump-trader PDA is pump user. SpendVault is never user.",
+      "remaining_accounts must be the official 27-account buy_v2 list; user slot must be the pump-trader PDA.",
+      "Live on MAINNET INTENTS 3HCErAF after the upgrade. 27 remaining accounts need a v0 tx + address lookup table on public RPC.",
+      "Migrated (complete) bonding curves cannot buy_v2. Limit orders do not exist. Launch is pump_create (not this tool).",
+    ],
+  };
+}
+
+export function validatePumpSell(args: {
+  amount: bigint;
+  minSolOutput: bigint;
+  sponsorLamports: bigint;
+}): { warnings: string[] } {
+  if (args.amount <= 0n) {
+    throw new PolicyError("ZeroAmount", "pump_sell amount (base tokens) must be greater than zero");
+  }
+  void args.minSolOutput;
+  if (args.sponsorLamports > BigInt(MAX_SPONSOR_LAMPORTS)) {
+    throw new PolicyError(
+      "SponsorCapExceeded",
+      `sponsor_lamports exceeds MAX_SPONSOR_LAMPORTS (${MAX_SPONSOR_LAMPORTS})`,
+    );
+  }
+  return {
+    warnings: [
+      "pump_sell is a tight INTENTS adapter for official pump.fun sell_v2. Grant amount is 0 (tokens out, not SOL).",
+      "Pump-trader PDA is pump user. SpendVault is never user. Agent signs; relayer fee-pays. Not a general router.",
+      "remaining_accounts must be the official 26-account sell_v2 list; user slot must be the pump-trader PDA.",
+      "Live on MAINNET INTENTS 3HCErAF after the upgrade.",
+    ],
+  };
+}
+
+export function validatePumpCreate(args: {
+  name: string;
+  symbol: string;
+  uri: string;
+  maxSolCost: bigint;
+  sponsorLamports: bigint;
+}): { warnings: string[] } {
+  if ([...args.name].length > PUMP_CREATE_NAME_MAX) {
+    throw new PolicyError("PumpCreateNameTooLong", `pump_create name exceeds ${PUMP_CREATE_NAME_MAX} characters`);
+  }
+  if ([...args.symbol].length > PUMP_CREATE_SYMBOL_MAX) {
+    throw new PolicyError("PumpCreateSymbolTooLong", `pump_create symbol exceeds ${PUMP_CREATE_SYMBOL_MAX} characters`);
+  }
+  if ([...args.uri].length > PUMP_CREATE_URI_MAX) {
+    throw new PolicyError("PumpCreateUriTooLong", `pump_create uri exceeds ${PUMP_CREATE_URI_MAX} characters`);
+  }
+  if (args.maxSolCost <= 0n) {
+    throw new PolicyError("ZeroAmount", "pump_create max_sol_cost must be greater than zero (grant SOL budget for rent + create fees)");
+  }
+  if (args.sponsorLamports > BigInt(MAX_SPONSOR_LAMPORTS)) {
+    throw new PolicyError(
+      "SponsorCapExceeded",
+      `sponsor_lamports exceeds MAX_SPONSOR_LAMPORTS (${MAX_SPONSOR_LAMPORTS})`,
+    );
+  }
+  return {
+    warnings: [
+      "pump_create is a tight INTENTS adapter for official pump.fun create_v2. Not a general router.",
+      "Mint is a NEW Token-2022 keypair signed by the client (relayer/root). This MCP never accepts or prints mint secret material.",
+      "Pump-trader PDA is pump user. SpendVault is never user. Creator on-chain is grok_account.root.",
+      "Grant cap is max_sol_cost (rent + create fees). Leftover SOL is swept trader → vault.",
+      "remaining_accounts must be the official 16-account create_v2 list (or 19 with quote remaining). mint slot (0) must be a signer. user slot (5) must be the pump-trader PDA.",
+      "Live on MAINNET INTENTS 3HCErAF after the upgrade. Limit orders do not exist.",
+    ],
+  };
+}
+

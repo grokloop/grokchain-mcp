@@ -8,7 +8,8 @@ import type { ToolResult } from "../types.js";
 
 /**
  * Implemented INTENTS `swap` client. Grant-gated SOL send with min_out.
- * Not Jupiter. Not an AMM. Not SPL.
+ * Not Jupiter. Not an AMM. Not SPL. Not pump.fun.
+ * For a real pump.fun trade use pump_buy / pump_sell.
  * Agent signs. Relayer fee-pays. Bot never holds SOL.
  */
 export async function swapTool(

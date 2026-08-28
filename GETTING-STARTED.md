@@ -1,6 +1,6 @@
 # Getting started on Grok Chain (MAINNET)
 
-Pay is live on Solana MAINNET. swap, deploy, and call are not on this public INTENTS binary. The human wallet is the only secret you keep. The bot never gets a seed.
+Pay, pump, call, and deploy are live on Solana MAINNET INTENTS `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw`. deploy is a grant event, not an ELF upload. swap is a grant-gated SOL min_out send, not an AMM. pump is official pump.fun. The human wallet is the only secret you keep. The bot never gets a seed.
 
 There is no setup --mainnet yet. Do not use setup --devnet as the MAINNET path. Set env, then run the MCP:
 
@@ -47,7 +47,7 @@ Env names **PATHS**, never seeds or key bytes.
 - Agent and relayer are host files mode `0600`. Reused if they already exist. Never overwrite.
 - Never paste a seed into a bot. Never ask a bot for a key.
 - Relayer pays fees. Human funds vaults. Bot never holds SOL.
-- CORE / INTENTS ids on **MAINNET** (pay only):
+- CORE / INTENTS ids on **MAINNET** (pay + pump + call + deploy):
   - CORE `44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd`
     https://explorer.solana.com/address/44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd
   - INTENTS `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw`
@@ -56,9 +56,37 @@ Env names **PATHS**, never seeds or key bytes.
 - Grant allowlist on MAINNET is the INTENTS id `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw`.
 - Token CA `2x4iY5AaiGyRfxzHzSY1KzQJ7K82SDqmkMApwbcRpump` is a mint, not these programs.
 - Local-only ids `8WDhHSfrz6hMkmX7WteAAmyuWFLryHM2Kfc1r4k8EFXE` and `AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2` are refused off localnet.
-- `swap` / `deploy` / `call` are not on this public INTENTS binary. Do not claim they are live on MAINNET.
+- `deploy` is a grant event (`DeployRequested`). It does not upload an ELF.
+- `swap` is a grant-gated SOL min_out send. Not an AMM. Not Jupiter.
+- `pump_buy` / `pump_sell` / `pump_create` are official pump.fun CPIs. Trader PDA is user. SpendVault is never user.
+- Migrated (complete) bonding curves cannot `buy_v2`. 27-account `pump_buy` needs a v0 transaction + address lookup table on public RPC.
+
 
 Long form (every step by hand): [HUMAN.md](./HUMAN.md).
+
+
+## MAINNET pump
+
+Same env as pay. Extra for a trade:
+
+1. Root calls `init_pump_trader` once. Trader PDA seeds `[pump-trader, grok_account]`. System-owned. 0-byte.
+2. Grant cap must cover `max_sol_cost`. `revise_grant` if the current cap is too small.
+3. Fund SpendVault so spendable covers `max_sol_cost` plus the vault rent floor.
+4. Client creates the trader Token-2022 ATA (CreateIdempotent). Relayer fee-pays. Adapter does not create ATAs.
+5. `remaining_accounts` = official pump.fun `buy_v2` (27) / `sell_v2` (26) / `create_v2` (16 or 19). `user` is the trader PDA.
+6. Public RPC rejects a legacy 27-account tx (1232-byte packet). Send v0 with an address lookup table.
+
+```bash
+export GROKCHAIN_CLUSTER=mainnet-beta
+export GROKCHAIN_RPC_URL=https://api.mainnet-beta.solana.com
+export GROKCHAIN_PROGRAM_ID=44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd
+export GROKCHAIN_INTENTS_PROGRAM_ID=3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw
+export GROKCHAIN_ROOT_KEYPAIR=$HOME/.config/solana/id.json
+export GROKCHAIN_AGENT_KEYPAIR=$HOME/.config/grokchain/agent.json
+export GROKCHAIN_RELAYER_KEYPAIR=$HOME/.config/grokchain/relayer.json
+```
+
+Do not Jupiter-swap and call it Grok Chain.
 
 ## DEVNET rehearsal
 

@@ -8,7 +8,7 @@ On **localnet**, CORE and INTENTS default to the local-only validator pair
 They are not a deployed program. They are not on devnet. They are not on
 mainnet. Do not treat them as live.
 
-On **MAINNET**, CORE and INTENTS are the pay-only deployed programs:
+On **MAINNET**, CORE and INTENTS are the deployed programs (pay + pump + call + deploy):
 
 - CORE: `44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd`
   https://explorer.solana.com/address/44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd
@@ -38,11 +38,12 @@ Chain pays.
 | revise_grant | implemented CORE client. Same cluster split. |
 | revoke_grant | implemented CORE client. Same cluster split. |
 | check_grant | implemented CORE client. Same cluster split. |
-| pay | implemented INTENTS client. **MAINNET**: real pay-only INTENTS id `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw`. DEVNET rehearsal: old grokchain-devnet INTENTS id. localnet: local-only INTENTS id. Relayer fee-pays. Human-funded vaults. Lands only if the human has rooted the account, issued a grant allowlisting the cluster INTENTS id, funded SpendVault + Paymaster, and set RELAYER_KEYPAIR. Otherwise need_human_signature / need_human_setup. Do not fake a send. |
+| pay | implemented INTENTS client. **MAINNET**: real INTENTS id `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw`. DEVNET rehearsal: old grokchain-devnet INTENTS id. localnet: local-only INTENTS id. Relayer fee-pays. Human-funded vaults. Lands only if the human has rooted the account, issued a grant allowlisting the cluster INTENTS id, funded SpendVault + Paymaster, and set RELAYER_KEYPAIR. Otherwise need_human_signature / need_human_setup. Do not fake a send. |
 | vault / paymaster CLI | implemented INTENTS client (same ids as pay). Root-signed. Human funds. |
-| swap | implemented INTENTS client. Grant-gated SOL send with min_out. Not a DEX. localnet: local-only INTENTS id (lands only if that validator runs this binary). Not upgraded on grokchain-devnet in this change — do not claim the new ix is live on public Solana. |
-| deploy | implemented INTENTS client. check_grant(0) + DeployRequested. Not a BPF deploy. No ELF. Same cluster honesty as swap. |
-| call | implemented INTENTS client. amount 0 = policy ping. amount > 0 debits SpendVault. remaining empty = grant-checked only. CORE allowlists INTENTS, not the inner target. Same cluster honesty as swap. |
+| swap | implemented INTENTS client. Grant-gated SOL send with min_out. **Not an AMM. Not Jupiter.** **MAINNET**: live on upgraded 3HCErAF. |
+| deploy | implemented INTENTS client. check_grant(0) + DeployRequested. **Not a BPF deploy. No ELF.** **MAINNET**: live as a grant event. |
+| call | implemented INTENTS client. amount 0 = policy ping. amount > 0 debits SpendVault. remaining empty = grant-checked only. **MAINNET**: live. |
+| pump_buy / pump_sell / pump_create | implemented INTENTS client. Official pump.fun buy_v2 / sell_v2 / create_v2. Trader PDA is user. Vault is never user. **MAINNET**: live on 3HCErAF. 27-account buy needs v0 + ALT on public RPC. Complete bonding curves cannot buy_v2. |
 
 Optional read-only: get_account, get_grant.
 
@@ -54,7 +55,7 @@ Optional sponsor reimburses the relayer from YOUR paymaster.
 
 `GROKCHAIN_CLUSTER=mainnet-beta` plus `config/mainnet.json`, or `GROKCHAIN_CONFIG`. Env `GROKCHAIN_PROGRAM_ID` / `GROKCHAIN_INTENTS_PROGRAM_ID` override file values if set.
 
-Real MAINNET pay-only program ids:
+Real MAINNET program ids:
 
 - CORE: `44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd`
   Explorer: https://explorer.solana.com/address/44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd
@@ -63,7 +64,7 @@ Real MAINNET pay-only program ids:
 
 There is no `setup --mainnet`. Do not use `setup --devnet` as the MAINNET path. Each root funds their own vault, paymaster, and relayer. Do not send SOL to `EcSnayFcwspNch8ChurzLwmg8zAsRPLtysUrf1QuPtXX` or `E8Pm8RG6L2qxLKTtMgYr8JQgJJtbRTzyKCdJRiPQSL1z`.
 
-On **MAINNET**, create/issue/revise/revoke/check_grant and pay/vaults are implemented clients against the real deployed ids. They land only if the human has rooted the account, issued a grant allowlisting the **MAINNET INTENTS** id `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw`, funded SpendVault + Paymaster, and set RELAYER_KEYPAIR. Otherwise need_human_signature / need_human_setup. swap/deploy/call are not on this public INTENTS binary.
+On **MAINNET**, create/issue/revise/revoke/check_grant, pay/vaults, pump_buy/sell/create, call, and deploy are implemented clients against the real deployed ids. They land only if the human has rooted the account, issued a grant allowlisting the **MAINNET INTENTS** id `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw`, funded SpendVault + Paymaster, and set RELAYER_KEYPAIR. Otherwise need_human_signature / need_human_setup. deploy is a grant event, not an ELF upload. swap is SOL min_out, not an AMM.
 
 ## DEVNET rehearsal
 

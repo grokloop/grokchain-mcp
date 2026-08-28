@@ -10,6 +10,9 @@ import { payTool } from "./tools/pay.js";
 import { callTool } from "./tools/call.js";
 import { deployTool } from "./tools/deploy.js";
 import { swapTool } from "./tools/swap.js";
+import { pumpBuyTool } from "./tools/pump_buy.js";
+import { pumpSellTool } from "./tools/pump_sell.js";
+import { pumpCreateTool } from "./tools/pump_create.js";
 import { getAccountTool, getGrantTool } from "./tools/reads.js";
 import { reviseGrantTool } from "./tools/revise_grant.js";
 import { revokeGrantTool } from "./tools/revoke_grant.js";
@@ -137,6 +140,79 @@ function buildServer(): McpServer {
       dry_run: z.boolean().optional(),
     },
     async (args) => jsonResult(await swapTool(args)),
+  );
+
+  server.tool(
+    "pump_buy",
+    "Tight INTENTS pump.fun buy_v2 adapter. Grant-gated. Live on MAINNET INTENTS 3HCErAF. Pump-trader PDA is pump user (invoke_signed trader seeds). remaining_accounts must be the official 27-account buy_v2 list with user=pump-trader (not SpendVault). Agent signs. Relayer fee-pays. Bot never holds SOL. Not a general router. Not Jupiter. 27 remaining accounts need a v0 tx + address lookup table on public RPC. Complete bonding curves cannot buy_v2.",
+    {
+      mint: pubkey.optional().describe("Base mint. Defaults to the documented Grok token CA (Token-2022)."),
+      amount: z
+        .union([z.number().int().positive(), z.string()])
+        .describe("Base tokens to buy (raw units). Must be > 0."),
+      max_sol_cost: z
+        .union([z.number().int().positive(), z.string()])
+        .describe("Max SOL (lamports) the vault will spend. This is the grant budget."),
+      remaining_accounts: z
+        .array(z.union([pubkey, z.object({ pubkey, isSigner: z.boolean().optional(), isWritable: z.boolean().optional() })]))
+        .describe("Official buy_v2 account list (27). user slot (13) must be the pump-trader PDA, not SpendVault. Last account must be pump.fun."),
+      sponsor_lamports: z
+        .union([z.number().int().nonnegative(), z.string()])
+        .optional(),
+      root: pubkey.optional(),
+      dry_run: z.boolean().optional(),
+    },
+    async (args) => jsonResult(await pumpBuyTool(args)),
+  );
+
+  server.tool(
+    "pump_sell",
+    "Tight INTENTS pump.fun sell_v2 adapter. Live on MAINNET INTENTS 3HCErAF. Grant amount is 0 (tokens out, not SOL). Pump-trader PDA is pump user. remaining_accounts must be the official 26-account sell_v2 list with user=pump-trader. Not a general router. Limit orders are not implemented.",
+    {
+      mint: pubkey.optional().describe("Base mint. Defaults to the documented Grok token CA (Token-2022)."),
+      amount: z
+        .union([z.number().int().positive(), z.string()])
+        .describe("Base tokens to sell (raw units). Must be > 0."),
+      min_sol_output: z
+        .union([z.number().int().nonnegative(), z.string()])
+        .optional()
+        .describe("Minimum quote (lamports) after fees. 0 = accept any."),
+      remaining_accounts: z
+        .array(z.union([pubkey, z.object({ pubkey, isSigner: z.boolean().optional(), isWritable: z.boolean().optional() })]))
+        .describe("Official sell_v2 account list (26). user slot (13) must be the pump-trader PDA, not SpendVault. Last account must be pump.fun."),
+      sponsor_lamports: z
+        .union([z.number().int().nonnegative(), z.string()])
+        .optional(),
+      root: pubkey.optional(),
+      dry_run: z.boolean().optional(),
+    },
+    async (args) => jsonResult(await pumpSellTool(args)),
+  );
+
+
+  server.tool(
+    "pump_create",
+    "Tight INTENTS pump.fun create_v2 adapter. Live on MAINNET INTENTS 3HCErAF. Grant-gated coin launch. Mint is a NEW Token-2022 keypair signed by the client (relayer/root) — this MCP never accepts or prints mint secret/keypair JSON. Pump-trader PDA is pump user (remaining[5]). SpendVault is never user. Creator on-chain is grok_account.root. remaining_accounts must be the official 16-account create_v2 list (or 19 with quote remaining). Agent signs. Relayer fee-pays. Bot never holds SOL. Not a general router.",
+    {
+      mint: pubkey.describe("New Token-2022 mint pubkey. Client signs this keypair on the outer tx. Never a secret."),
+      name: z.string().describe("Coin name. Maximum 32 characters."),
+      symbol: z.string().describe("Coin symbol. Maximum 13 characters."),
+      uri: z.string().describe("Metadata URI. Maximum 200 characters."),
+      max_sol_cost: z
+        .union([z.number().int().positive(), z.string()])
+        .describe("Max SOL (lamports) the vault will spend for rent + create fees. This is the grant budget."),
+      remaining_accounts: z
+        .array(z.union([pubkey, z.object({ pubkey, isSigner: z.boolean().optional(), isWritable: z.boolean().optional() })]))
+        .describe("Official create_v2 account list (16, or 19 with quote remaining). mint slot (0) must be a signer. user slot (5) must be the pump-trader PDA, not SpendVault. remaining[15] must be pump.fun."),
+      is_mayhem_mode: z.boolean().optional().describe("Official create_v2 is_mayhem_mode. Default false."),
+      is_cashback_enabled: z.boolean().optional().describe("Official create_v2 OptionBool cashback flag. Default false."),
+      sponsor_lamports: z
+        .union([z.number().int().nonnegative(), z.string()])
+        .optional(),
+      root: pubkey.optional(),
+      dry_run: z.boolean().optional(),
+    },
+    async (args) => jsonResult(await pumpCreateTool(args)),
   );
 
   server.tool(

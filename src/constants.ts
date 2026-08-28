@@ -28,6 +28,7 @@ export const SEED_GROK_ACCOUNT = Buffer.from("grok-account");
 export const SEED_GRANT = Buffer.from("grant");
 export const SEED_SPEND_VAULT = Buffer.from("spend-vault");
 export const SEED_PAYMASTER = Buffer.from("paymaster");
+export const SEED_PUMP_TRADER = Buffer.from("pump-trader");
 
 export const MAX_ALLOWED_PROGRAMS = 8;
 export const LABEL_LEN = 32;
@@ -59,7 +60,36 @@ export const INTENTS_DISC = {
   swap: Buffer.from([248, 198, 158, 145, 225, 117, 135, 200]),
   deploy: Buffer.from([67, 36, 143, 118, 36, 164, 92, 217]),
   call: Buffer.from([181, 94, 56, 161, 194, 221, 200, 3]),
+  pump_buy: Buffer.from([82, 225, 119, 231, 78, 29, 45, 70]),
+  pump_sell: Buffer.from([93, 88, 60, 34, 91, 18, 86, 197]),
+  init_pump_trader: Buffer.from([92, 98, 75, 2, 93, 219, 250, 5]),
+  fund_pump_trader: Buffer.from([63, 189, 216, 54, 81, 101, 241, 97]),
+  pump_create: Buffer.from([24, 176, 142, 141, 243, 152, 56, 128]),
 } as const;
+
+/** Official pump.fun program. Only inner program pump_buy/pump_sell/pump_create CPI into. */
+export const PUMP_PROGRAM_ID = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P";
+
+/** Documented Grok token CA (Token-2022). Adapter is mint-agnostic. */
+export const GROK_TOKEN_MINT = "2x4iY5AaiGyRfxzHzSY1KzQJ7K82SDqmkMApwbcRpump";
+
+/** Official pump.fun instruction discriminators. */
+export const PUMP_DISC = {
+  buy_v2: Buffer.from([0xb8, 0x17, 0xee, 0x61, 0x67, 0xc5, 0xd3, 0x3d]),
+  sell_v2: Buffer.from([0x5d, 0xf6, 0x82, 0x3c, 0xe7, 0xe9, 0x40, 0xb2]),
+  create_v2: Buffer.from([0xd6, 0x90, 0x4c, 0xec, 0x5f, 0x8b, 0x31, 0xb4]),
+} as const;
+
+export const PUMP_BUY_V2_ACCOUNT_COUNT = 27;
+export const PUMP_SELL_V2_ACCOUNT_COUNT = 26;
+export const PUMP_USER_INDEX = 13;
+export const PUMP_CREATE_V2_ACCOUNT_COUNT = 16;
+export const PUMP_CREATE_V2_ACCOUNT_COUNT_WITH_QUOTE = 19;
+export const PUMP_CREATE_MINT_INDEX = 0;
+export const PUMP_CREATE_USER_INDEX = 5;
+export const PUMP_CREATE_NAME_MAX = 32;
+export const PUMP_CREATE_SYMBOL_MAX = 13;
+export const PUMP_CREATE_URI_MAX = 200;
 
 /** Anchor account discriminators. */
 export const ACCOUNT_DISC = {

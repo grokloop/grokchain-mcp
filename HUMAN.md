@@ -9,7 +9,7 @@ On **localnet**, CORE and INTENTS default to the local-only validator pair. Thos
 - Local-only CORE (localnet only): `8WDhHSfrz6hMkmX7WteAAmyuWFLryHM2Kfc1r4k8EFXE`
 - Local-only INTENTS (localnet only): `AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2`
 
-On **MAINNET**, CORE and INTENTS are the pay-only deployed programs:
+On **MAINNET**, CORE and INTENTS are the deployed programs (pay + pump + call + deploy):
 
 - CORE: `44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd`
   https://explorer.solana.com/address/44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd
@@ -29,7 +29,7 @@ Human funds **two** vaults: SpendVault (pay source) and Paymaster (gas). Two dep
 
 Grant allowlist is **router mode**: allowlist the INTENTS program id for this cluster, not SystemProgram and not every inner DEX.
 
-On **MAINNET**, create/issue/revise/revoke/check_grant and pay/vaults are implemented clients against the real deployed ids. They land only if the human has rooted the account, issued a grant allowlisting the **MAINNET INTENTS** id `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw`, funded SpendVault + Paymaster, and set `GROKCHAIN_RELAYER_KEYPAIR`. Otherwise `need_human_signature` / `need_human_setup`. `swap` / `deploy` / `call` are not on this public INTENTS binary. Each root funds their own vault, paymaster, and relayer. Do not send SOL to `EcSnayFcwspNch8ChurzLwmg8zAsRPLtysUrf1QuPtXX` or `E8Pm8RG6L2qxLKTtMgYr8JQgJJtbRTzyKCdJRiPQSL1z`.
+On **MAINNET**, create/issue/revise/revoke/check_grant, pay/vaults, pump_buy/sell/create, call, and deploy are implemented clients against the real deployed ids. They land only if the human has rooted the account, issued a grant allowlisting the **MAINNET INTENTS** id `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw`, funded SpendVault + Paymaster, and set `GROKCHAIN_RELAYER_KEYPAIR`. Otherwise `need_human_signature` / `need_human_setup`. `deploy` is a grant event, not an ELF upload. `swap` is SOL min_out, not an AMM. `pump_*` is official pump.fun (trader is user). Each root funds their own vault, paymaster, and relayer. Do not send SOL to `EcSnayFcwspNch8ChurzLwmg8zAsRPLtysUrf1QuPtXX` or `E8Pm8RG6L2qxLKTtMgYr8JQgJJtbRTzyKCdJRiPQSL1z`.
 
 ## 1. Install Solana CLI. Use your own wallet.
 
@@ -73,7 +73,7 @@ Local-only INTENTS id (not deployed, not devnet, not mainnet): `AXprcURLhSqj35v9
 
 `GROKCHAIN_CLUSTER=mainnet-beta` plus `config/mainnet.json`, or `GROKCHAIN_CONFIG=/path/to/config/mainnet.json`. Env `GROKCHAIN_PROGRAM_ID` / `GROKCHAIN_INTENTS_PROGRAM_ID` override file values if set. There is no `setup --mainnet`. Do not use `setup --devnet` as the MAINNET path.
 
-Real MAINNET pay-only program ids:
+Real MAINNET program ids:
 
 - CORE: `44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd`
   Explorer: https://explorer.solana.com/address/44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd
@@ -90,7 +90,12 @@ export GROKCHAIN_AGENT_KEYPAIR="$HOME/.config/grokchain/agent.json"
 export GROKCHAIN_RELAYER_KEYPAIR="$HOME/.config/grokchain/relayer.json"
 ```
 
-A bot `pay` on MAINNET **builds** against the real INTENTS id. It **lands** only after you complete the root / grant / vault / paymaster / relayer setup below. Missing any of those returns `need_human_signature` or `need_human_setup`. Do not fake a send. Each root funds their own vault, paymaster, and relayer. Do not send SOL to `EcSnayFcwspNch8ChurzLwmg8zAsRPLtysUrf1QuPtXX` or `E8Pm8RG6L2qxLKTtMgYr8JQgJJtbRTzyKCdJRiPQSL1z`.
+A bot `pay` / `pump_buy` / `call` / `deploy` on MAINNET **builds** against the real INTENTS id. It **lands** only after you complete the root / grant / vault / paymaster / relayer setup below. Missing any of those returns `need_human_signature` or `need_human_setup`. Do not fake a send. Each root funds their own vault, paymaster, and relayer. Do not send SOL to `EcSnayFcwspNch8ChurzLwmg8zAsRPLtysUrf1QuPtXX` or `E8Pm8RG6L2qxLKTtMgYr8JQgJJtbRTzyKCdJRiPQSL1z`.
+
+### MAINNET pump
+
+Same env as pay. `init_pump_trader` once (root). Grant cap and SpendVault must cover `max_sol_cost`. Trader Token-2022 ATA is created by the client (relayer fee-pays). `remaining_accounts` is the official pump.fun list; `user` is the trader PDA, never the vault. Public RPC cannot fit a legacy 27-account `buy_v2` — send v0 + address lookup table. Complete bonding curves cannot `buy_v2`. Do not Jupiter-swap and call it Grok Chain.
+
 
 ## DEVNET rehearsal
 

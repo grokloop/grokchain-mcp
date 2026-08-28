@@ -37,7 +37,9 @@ export function honestyNotes(cfg: AppConfig, extra: string[]): string[] {
   return [
     ...extra,
     "Agent signs. Relayer is the outer fee payer. Bot never holds SOL.",
-    cfg.cluster === "devnet"
+    cfg.cluster === "mainnet-beta"
+      ? `Builds against MAINNET INTENTS ${cfg.intentsProgramId.toBase58()}. pay, pump_buy/sell/create, call, and deploy are on this upgraded binary. deploy is a grant event, not an ELF upload. swap is SOL min_out, not an AMM. pump is official pump.fun (trader is user, vault never user). 27-account pump_buy needs a v0 tx + address lookup table on public RPC.`
+      : cfg.cluster === "devnet"
       ? `Builds against grokchain-devnet INTENTS ${cfg.intentsProgramId.toBase58() === DEVNET_INTENTS_PROGRAM_ID ? DEVNET_INTENTS_PROGRAM_ID : cfg.intentsProgramId.toBase58()}. This source was not upgraded on devnet in the swap/deploy/call change. The live binary may still reject the new ixs. Do not claim they are live on public Solana.`
       : "On localnet, builds against the local-only INTENTS id. Lands only if the local validator is running this INTENTS binary and CORE.",
   ];
@@ -57,7 +59,7 @@ export type BuiltIntent = {
  */
 export async function submitAgentIntent(opts: {
   raw: Record<string, unknown> & { root?: string; dry_run?: boolean };
-  intent: "swap" | "deploy" | "call";
+  intent: "swap" | "deploy" | "call" | "pump_buy" | "pump_sell" | "pump_create";
   movedSolOnOk: boolean;
   extraFields: Record<string, unknown>;
   notes: string[];

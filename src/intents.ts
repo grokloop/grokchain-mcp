@@ -4,9 +4,9 @@ import {
   TransactionInstruction,
   type AccountMeta,
 } from "@solana/web3.js";
-import { INTENTS_DISC } from "./constants.js";
-import { encodeCallArgs, encodeDeployArgs, encodePayArgs, encodePubkey, encodeSwapArgs, encodeU64 } from "./encode.js";
-import { grantPda, grokAccountPda, paymasterPda, spendVaultPda } from "./pda.js";
+import { INTENTS_DISC, PUMP_BUY_V2_ACCOUNT_COUNT, PUMP_CREATE_MINT_INDEX, PUMP_CREATE_USER_INDEX, PUMP_CREATE_V2_ACCOUNT_COUNT, PUMP_CREATE_V2_ACCOUNT_COUNT_WITH_QUOTE, PUMP_PROGRAM_ID, PUMP_SELL_V2_ACCOUNT_COUNT, PUMP_USER_INDEX } from "./constants.js";
+import { encodeCallArgs, encodeDeployArgs, encodePayArgs, encodePubkey, encodePumpBuyArgs, encodePumpCreateArgs, encodePumpSellArgs, encodeSwapArgs, encodeU64 } from "./encode.js";
+import { grantPda, grokAccountPda, paymasterPda, pumpTraderPda, spendVaultPda } from "./pda.js";
 
 function meta(pubkey: PublicKey, isSigner: boolean, isWritable: boolean): AccountMeta {
   return { pubkey, isSigner, isWritable };
@@ -17,6 +17,7 @@ export type VaultAddrs = {
   spendVault: PublicKey;
   paymaster: PublicKey;
   grant: PublicKey;
+  pumpTrader: PublicKey;
 };
 
 export function deriveIntentsAddrs(opts: {
@@ -28,10 +29,11 @@ export function deriveIntentsAddrs(opts: {
   const [grokAccount] = grokAccountPda(opts.coreProgramId, opts.root);
   const [spendVault] = spendVaultPda(opts.intentsProgramId, grokAccount);
   const [paymaster] = paymasterPda(opts.intentsProgramId, grokAccount);
+  const [pumpTrader] = pumpTraderPda(opts.intentsProgramId, grokAccount);
   const [grant] = opts.agent
     ? grantPda(opts.coreProgramId, grokAccount, opts.agent)
     : [PublicKey.default, 0];
-  return { grokAccount, spendVault, paymaster, grant };
+  return { grokAccount, spendVault, paymaster, grant, pumpTrader };
 }
 
 function vaultInitKeys(opts: {
@@ -445,3 +447,290 @@ function prependTargetForInvoke(target: PublicKey, remaining: AccountMeta[]): Ac
   if (remaining.some((a) => a.pubkey.equals(target))) return remaining;
   return [meta(target, false, false), ...remaining];
 }
+
+function pumpMouthKeys(opts: {
+  agent: PublicKey;
+  grokAccount: PublicKey;
+  grant: PublicKey;
+  coreProgramId: PublicKey;
+  intentsProgramId: PublicKey;
+  spendVault: PublicKey;
+  pumpTrader: PublicKey;
+  paymaster: PublicKey;
+  sponsorLamports: bigint | number | string;
+  feePayer?: PublicKey;
+}): AccountMeta[] {
+  const sk = sponsorKeys({
+    intentsProgramId: opts.intentsProgramId,
+    paymaster: opts.paymaster,
+    sponsorLamports: opts.sponsorLamports,
+    feePayer: opts.feePayer,
+  });
+  // Always attach the relayer as fee_payer when present so ATA create can pay rent.
+  const feePayerKey = opts.feePayer ?? sk.feePayerKey;
+  const feePayerSigner = !!opts.feePayer;
+  return [
+    meta(opts.agent, true, false),
+    meta(opts.grokAccount, false, false),
+    meta(opts.grant, false, true),
+    meta(opts.coreProgramId, false, false),
+    meta(opts.intentsProgramId, false, false),
+    meta(opts.spendVault, false, true),
+    meta(opts.pumpTrader, false, true),
+    meta(SystemProgram.programId, false, false),
+    meta(new PublicKey(PUMP_PROGRAM_ID), false, false),
+    meta(sk.paymasterKey, false, true),
+    meta(feePayerKey, feePayerSigner, true),
+  ];
+}
+
+function assertOfficialPumpAccounts(
+  remaining: AccountMeta[],
+  pumpTrader: PublicKey,
+  spendVault: PublicKey,
+  expected: number,
+  kind: "buy" | "sell",
+): void {
+  if (remaining.length !== expected) {
+    throw new Error(
+      `pump_${kind} remaining_accounts must be the official ${expected}-account ${kind}_v2 list (got ${remaining.length})`,
+    );
+  }
+  const user = remaining[PUMP_USER_INDEX];
+  if (user && user.pubkey.equals(spendVault)) {
+    throw new Error(`pump_${kind} remaining[${PUMP_USER_INDEX}] (user) must be the pump-trader PDA, not SpendVault`);
+  }
+  if (!user || !user.pubkey.equals(pumpTrader)) {
+    throw new Error(`pump_${kind} remaining[${PUMP_USER_INDEX}] (user) must be the pump-trader PDA`);
+  }
+  const prog = remaining[expected - 1];
+  if (!prog || prog.pubkey.toBase58() !== PUMP_PROGRAM_ID) {
+    throw new Error(`pump_${kind} remaining last account must be official pump.fun ${PUMP_PROGRAM_ID}`);
+  }
+}
+
+/** Tight INTENTS pump_buy. remaining_accounts = official buy_v2 list (27). */
+export function buildPumpBuyIx(opts: {
+  coreProgramId: PublicKey;
+  intentsProgramId: PublicKey;
+  root: PublicKey;
+  agent: PublicKey;
+  amount: bigint | number | string;
+  maxSolCost: bigint | number | string;
+  sponsorLamports: bigint | number | string;
+  feePayer?: PublicKey;
+  remainingAccounts: AccountMeta[];
+}): { ix: TransactionInstruction } & VaultAddrs {
+  const addrs = deriveIntentsAddrs({ ...opts, agent: opts.agent });
+  assertOfficialPumpAccounts(opts.remainingAccounts, addrs.pumpTrader, addrs.spendVault, PUMP_BUY_V2_ACCOUNT_COUNT, "buy");
+  const keys: AccountMeta[] = [
+    ...pumpMouthKeys({
+      agent: opts.agent,
+      grokAccount: addrs.grokAccount,
+      grant: addrs.grant,
+      coreProgramId: opts.coreProgramId,
+      intentsProgramId: opts.intentsProgramId,
+      spendVault: addrs.spendVault,
+      pumpTrader: addrs.pumpTrader,
+      paymaster: addrs.paymaster,
+      sponsorLamports: opts.sponsorLamports,
+      feePayer: opts.feePayer,
+    }),
+    ...opts.remainingAccounts,
+  ];
+  const data = Buffer.concat([
+    Buffer.from(INTENTS_DISC.pump_buy),
+    encodePumpBuyArgs({
+      amount: opts.amount,
+      maxSolCost: opts.maxSolCost,
+      sponsorLamports: opts.sponsorLamports,
+    }),
+  ]);
+  return {
+    ...addrs,
+    ix: new TransactionInstruction({
+      programId: opts.intentsProgramId,
+      keys,
+      data,
+    }),
+  };
+}
+
+/** Tight INTENTS pump_sell. remaining_accounts = official sell_v2 list (26). */
+export function buildPumpSellIx(opts: {
+  coreProgramId: PublicKey;
+  intentsProgramId: PublicKey;
+  root: PublicKey;
+  agent: PublicKey;
+  amount: bigint | number | string;
+  minSolOutput: bigint | number | string;
+  sponsorLamports: bigint | number | string;
+  feePayer?: PublicKey;
+  remainingAccounts: AccountMeta[];
+}): { ix: TransactionInstruction } & VaultAddrs {
+  const addrs = deriveIntentsAddrs({ ...opts, agent: opts.agent });
+  assertOfficialPumpAccounts(opts.remainingAccounts, addrs.pumpTrader, addrs.spendVault, PUMP_SELL_V2_ACCOUNT_COUNT, "sell");
+  const keys: AccountMeta[] = [
+    ...pumpMouthKeys({
+      agent: opts.agent,
+      grokAccount: addrs.grokAccount,
+      grant: addrs.grant,
+      coreProgramId: opts.coreProgramId,
+      intentsProgramId: opts.intentsProgramId,
+      spendVault: addrs.spendVault,
+      pumpTrader: addrs.pumpTrader,
+      paymaster: addrs.paymaster,
+      sponsorLamports: opts.sponsorLamports,
+      feePayer: opts.feePayer,
+    }),
+    ...opts.remainingAccounts,
+  ];
+  const data = Buffer.concat([
+    Buffer.from(INTENTS_DISC.pump_sell),
+    encodePumpSellArgs({
+      amount: opts.amount,
+      minSolOutput: opts.minSolOutput,
+      sponsorLamports: opts.sponsorLamports,
+    }),
+  ]);
+  return {
+    ...addrs,
+    ix: new TransactionInstruction({
+      programId: opts.intentsProgramId,
+      keys,
+      data,
+    }),
+  };
+}
+
+export function buildInitPumpTraderIx(opts: {
+  coreProgramId: PublicKey;
+  intentsProgramId: PublicKey;
+  root: PublicKey;
+}): { ix: TransactionInstruction } & VaultAddrs {
+  const addrs = deriveIntentsAddrs(opts);
+  return {
+    ...addrs,
+    ix: new TransactionInstruction({
+      programId: opts.intentsProgramId,
+      keys: [
+        meta(opts.root, true, true),
+        meta(addrs.grokAccount, false, false),
+        meta(addrs.pumpTrader, false, true),
+        meta(SystemProgram.programId, false, false),
+      ],
+      data: Buffer.from(INTENTS_DISC.init_pump_trader),
+    }),
+  };
+}
+
+export function buildFundPumpTraderIx(opts: {
+  coreProgramId: PublicKey;
+  intentsProgramId: PublicKey;
+  root: PublicKey;
+  lamports: bigint | number | string;
+}): { ix: TransactionInstruction } & VaultAddrs {
+  const addrs = deriveIntentsAddrs(opts);
+  return {
+    ...addrs,
+    ix: new TransactionInstruction({
+      programId: opts.intentsProgramId,
+      keys: [
+        meta(opts.root, true, true),
+        meta(addrs.grokAccount, false, false),
+        meta(addrs.spendVault, false, true),
+        meta(addrs.pumpTrader, false, true),
+      ],
+      data: Buffer.concat([Buffer.from(INTENTS_DISC.fund_pump_trader), encodeU64(opts.lamports)]),
+    }),
+  };
+}
+
+function assertOfficialPumpCreateAccounts(
+  remaining: AccountMeta[],
+  pumpTrader: PublicKey,
+  spendVault: PublicKey,
+  mint: PublicKey,
+): void {
+  const n = remaining.length;
+  if (n !== PUMP_CREATE_V2_ACCOUNT_COUNT && n !== PUMP_CREATE_V2_ACCOUNT_COUNT_WITH_QUOTE) {
+    throw new Error(
+      `pump_create remaining_accounts must be the official ${PUMP_CREATE_V2_ACCOUNT_COUNT}-account create_v2 list (or ${PUMP_CREATE_V2_ACCOUNT_COUNT_WITH_QUOTE} with quote remaining); got ${n}`,
+    );
+  }
+  const mintAcc = remaining[PUMP_CREATE_MINT_INDEX];
+  if (!mintAcc || !mintAcc.pubkey.equals(mint)) {
+    throw new Error("pump_create remaining[0] (mint) must be the client Token-2022 mint pubkey");
+  }
+  if (!mintAcc.isSigner) {
+    throw new Error("pump_create remaining[0] (mint) must be a signer (client keypair, never vault)");
+  }
+  const user = remaining[PUMP_CREATE_USER_INDEX];
+  if (user && user.pubkey.equals(spendVault)) {
+    throw new Error("pump_create remaining[5] (user) must be the pump-trader PDA, not SpendVault");
+  }
+  if (!user || !user.pubkey.equals(pumpTrader)) {
+    throw new Error("pump_create remaining[5] (user) must be the pump-trader PDA");
+  }
+  const prog = remaining[PUMP_CREATE_V2_ACCOUNT_COUNT - 1];
+  if (!prog || prog.pubkey.toBase58() !== PUMP_PROGRAM_ID) {
+    throw new Error(`pump_create remaining[15] must be official pump.fun ${PUMP_PROGRAM_ID}`);
+  }
+}
+
+/** Tight INTENTS pump_create. remaining_accounts = official create_v2 list (16 or 19). */
+export function buildPumpCreateIx(opts: {
+  coreProgramId: PublicKey;
+  intentsProgramId: PublicKey;
+  root: PublicKey;
+  agent: PublicKey;
+  mint: PublicKey;
+  name: string;
+  symbol: string;
+  uri: string;
+  isMayhemMode: boolean;
+  isCashbackEnabled: boolean;
+  maxSolCost: bigint | number | string;
+  sponsorLamports: bigint | number | string;
+  feePayer?: PublicKey;
+  remainingAccounts: AccountMeta[];
+}): { ix: TransactionInstruction } & VaultAddrs {
+  const addrs = deriveIntentsAddrs({ ...opts, agent: opts.agent });
+  assertOfficialPumpCreateAccounts(opts.remainingAccounts, addrs.pumpTrader, addrs.spendVault, opts.mint);
+  const keys: AccountMeta[] = [
+    ...pumpMouthKeys({
+      agent: opts.agent,
+      grokAccount: addrs.grokAccount,
+      grant: addrs.grant,
+      coreProgramId: opts.coreProgramId,
+      intentsProgramId: opts.intentsProgramId,
+      spendVault: addrs.spendVault,
+      pumpTrader: addrs.pumpTrader,
+      paymaster: addrs.paymaster,
+      sponsorLamports: opts.sponsorLamports,
+      feePayer: opts.feePayer,
+    }),
+    ...opts.remainingAccounts,
+  ];
+  const data = Buffer.concat([
+    Buffer.from(INTENTS_DISC.pump_create),
+    encodePumpCreateArgs({
+      name: opts.name,
+      symbol: opts.symbol,
+      uri: opts.uri,
+      isMayhemMode: opts.isMayhemMode,
+      isCashbackEnabled: opts.isCashbackEnabled,
+      maxSolCost: opts.maxSolCost,
+      sponsorLamports: opts.sponsorLamports,
+    }),
+  ]);
+  return {
+    ...addrs,
+    ix: new TransactionInstruction({
+      programId: opts.intentsProgramId,
+      keys,
+      data,
+    }),
+  };
+}
+

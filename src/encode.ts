@@ -1,5 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
-import { LABEL_LEN } from "./constants.js";
+import { LABEL_LEN, PUMP_DISC } from "./constants.js";
 
 export function encodeU64(n: bigint | number | string): Buffer {
   const buf = Buffer.alloc(8);
@@ -111,6 +111,96 @@ export function encodeCallArgs(args: {
     encodeU64(args.amountLamports),
     encodeU64(args.sponsorLamports),
     encodePubkey(args.targetProgram),
+  ]);
+}
+
+/** Borsh PumpBuyArgs: u64 amount + u64 max_sol_cost + u64 sponsor */
+export function encodePumpBuyArgs(args: {
+  amount: bigint | number | string;
+  maxSolCost: bigint | number | string;
+  sponsorLamports: bigint | number | string;
+}): Buffer {
+  return Buffer.concat([
+    encodeU64(args.amount),
+    encodeU64(args.maxSolCost),
+    encodeU64(args.sponsorLamports),
+  ]);
+}
+
+/** Borsh PumpSellArgs: u64 amount + u64 min_sol_output + u64 sponsor */
+export function encodePumpSellArgs(args: {
+  amount: bigint | number | string;
+  minSolOutput: bigint | number | string;
+  sponsorLamports: bigint | number | string;
+}): Buffer {
+  return Buffer.concat([
+    encodeU64(args.amount),
+    encodeU64(args.minSolOutput),
+    encodeU64(args.sponsorLamports),
+  ]);
+}
+
+/** Official pump buy_v2 inner data (constructed on-chain; exported for tests). */
+export function encodePumpBuyV2Inner(
+  amount: bigint | number | string,
+  maxSolCost: bigint | number | string,
+): Buffer {
+  return Buffer.concat([Buffer.from(PUMP_DISC.buy_v2), encodeU64(amount), encodeU64(maxSolCost)]);
+}
+
+/** Official pump sell_v2 inner data (constructed on-chain; exported for tests). */
+export function encodePumpSellV2Inner(
+  amount: bigint | number | string,
+  minSolOutput: bigint | number | string,
+): Buffer {
+  return Buffer.concat([Buffer.from(PUMP_DISC.sell_v2), encodeU64(amount), encodeU64(minSolOutput)]);
+}
+
+function encodeBorshString(s: string): Buffer {
+  const bytes = Buffer.from(s, "utf8");
+  const len = Buffer.alloc(4);
+  len.writeUInt32LE(bytes.length, 0);
+  return Buffer.concat([len, bytes]);
+}
+
+/** Borsh PumpCreateArgs: name + symbol + uri + 2 bools + max_sol_cost + sponsor */
+export function encodePumpCreateArgs(args: {
+  name: string;
+  symbol: string;
+  uri: string;
+  isMayhemMode: boolean;
+  isCashbackEnabled: boolean;
+  maxSolCost: bigint | number | string;
+  sponsorLamports: bigint | number | string;
+}): Buffer {
+  return Buffer.concat([
+    encodeBorshString(args.name),
+    encodeBorshString(args.symbol),
+    encodeBorshString(args.uri),
+    encodeBool(args.isMayhemMode),
+    encodeBool(args.isCashbackEnabled),
+    encodeU64(args.maxSolCost),
+    encodeU64(args.sponsorLamports),
+  ]);
+}
+
+/** Official pump create_v2 inner data (constructed on-chain; exported for tests). */
+export function encodePumpCreateV2Inner(opts: {
+  name: string;
+  symbol: string;
+  uri: string;
+  creator: PublicKey;
+  isMayhemMode: boolean;
+  isCashbackEnabled: boolean;
+}): Buffer {
+  return Buffer.concat([
+    Buffer.from(PUMP_DISC.create_v2),
+    encodeBorshString(opts.name),
+    encodeBorshString(opts.symbol),
+    encodeBorshString(opts.uri),
+    encodePubkey(opts.creator),
+    encodeBool(opts.isMayhemMode),
+    encodeBool(opts.isCashbackEnabled),
   ]);
 }
 

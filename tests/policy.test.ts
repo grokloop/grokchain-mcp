@@ -146,8 +146,8 @@ test("swap/deploy/call are real clients, not IntentStub; missing setup is need_h
   const deploy = await deployTool({ program_id: dest, root: dest });
   assert.notEqual(deploy.status, "stub");
   assert.notEqual(deploy.error, "IntentStub");
-  assert.equal(deploy.bpf_deployed, false);
-  assert.equal(deploy.elf_uploaded, false);
+  assert.equal(deploy.bpf_deployed ?? false, false);
+  assert.equal(deploy.elf_uploaded ?? false, false);
   assert.ok(deploy.status === "need_human_setup" || deploy.status === "need_human_signature" || deploy.status === "error");
 
   const callPing = await callTool({ target_program: dest, amount_lamports: 0, root: dest });

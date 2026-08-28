@@ -1,0 +1,6 @@
+{
+  "cluster": "mainnet-beta",
+  "rpcUrl": "https://api.mainnet-beta.solana.com",
+  "coreProgramId": "44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd",
+  "intentsProgramId": "3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw"
+}

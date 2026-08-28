@@ -100,12 +100,28 @@ test("cluster=devnet auto-loads config/devnet.json real deployed ids", () => {
   }
 });
 
-test("cluster=mainnet-beta with no ids throws waiting / required", () => {
+const MAINNET_CORE = "44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd";
+const MAINNET_INTENTS = "3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw";
+
+test("cluster=mainnet-beta auto-loads config/mainnet.json real deployed ids", () => {
   const snap = snapshotEnv();
   try {
     clearIds();
     process.env.GROKCHAIN_CLUSTER = "mainnet-beta";
-    assert.throws(() => loadConfig(), /waiting|required/i);
+    const cfg = loadConfig();
+    assert.equal(cfg.cluster, "mainnet-beta");
+    assert.equal(cfg.rpcUrl, "https://api.mainnet-beta.solana.com");
+    assert.equal(cfg.programId.toBase58(), MAINNET_CORE);
+    assert.equal(cfg.intentsProgramId.toBase58(), MAINNET_INTENTS);
+    assert.equal(cfg.localOnlyProgram, false);
+    assert.equal(cfg.localOnlyIntents, false);
+    const notes = clusterNotes(cfg).join("\n");
+    assert.match(notes, /44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd/);
+    assert.match(notes, /3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw/);
+    assert.match(notes, /grokchain-mainnet deployed programs/);
+    assert.match(notes, /no seed export/i);
+    assert.doesNotMatch(notes, /8WDhHSfrz6hMkmX7WteAAmyuWFLryHM2Kfc1r4k8EFXE/);
+    assert.doesNotMatch(notes, /AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2/);
   } finally {
     restoreEnv(snap);
   }
@@ -229,7 +245,7 @@ test("loading config/devnet.json loads real grokchain-devnet ids", () => {
   }
 });
 
-test("a temp json with null ids throws waiting", () => {
+test("a temp json with null ids on mainnet-beta uses MAINNET defaults", () => {
   const snap = snapshotEnv();
   try {
     clearIds();
@@ -240,7 +256,10 @@ test("a temp json with null ids throws waiting", () => {
       intentsProgramId: null,
     });
     process.env.GROKCHAIN_CONFIG = p;
-    assert.throws(() => loadConfig(), /waiting|required/i);
+    const cfg = loadConfig();
+    assert.equal(cfg.cluster, "mainnet-beta");
+    assert.equal(cfg.programId.toBase58(), MAINNET_CORE);
+    assert.equal(cfg.intentsProgramId.toBase58(), MAINNET_INTENTS);
   } finally {
     restoreEnv(snap);
   }

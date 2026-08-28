@@ -30,8 +30,16 @@ const BANNED_LOCAL_ONLY_IDS = new Set([
   LOCAL_ONLY_INTENTS_PROGRAM_ID,
 ]);
 
+/** MAINNET pay-only deployed CORE. Used only when cluster=mainnet-beta. */
+const MAINNET_CORE_PROGRAM_ID =
+  "44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd";
+
+/** MAINNET pay-only deployed INTENTS. Used only when cluster=mainnet-beta. */
+const MAINNET_INTENTS_PROGRAM_ID =
+  "3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw";
+
 export const WAITING_ON_CORE_AND_PROGRAMS =
-  "Waiting on CORE and PROGRAMS for real deployed ids. Both CORE and INTENTS program ids are required when cluster is not localnet. Fill config/devnet.json or set GROKCHAIN_PROGRAM_ID and GROKCHAIN_INTENTS_PROGRAM_ID with real deployed ids only. Do not fall back to local-only defaults. null means not deployed yet.";
+  "Waiting on CORE and PROGRAMS for real deployed ids. Both CORE and INTENTS program ids are required when cluster is not localnet. Fill config/devnet.json or config/mainnet.json or set GROKCHAIN_PROGRAM_ID and GROKCHAIN_INTENTS_PROGRAM_ID with real deployed ids only. Do not fall back to local-only defaults. null means not deployed yet.";
 
 type FileConfig = {
   cluster?: string;
@@ -68,6 +76,15 @@ function resolveExistingFile(p: string): string {
 export function findDevnetConfigPath(): string | undefined {
   for (const root of packageRootCandidates()) {
     const candidate = path.join(root, "config", "devnet.json");
+    if (existsSync(candidate)) return candidate;
+  }
+  return undefined;
+}
+
+/** config/mainnet.json next to the package (cwd / import.meta / well-known relative). */
+export function findMainnetConfigPath(): string | undefined {
+  for (const root of packageRootCandidates()) {
+    const candidate = path.join(root, "config", "mainnet.json");
     if (existsSync(candidate)) return candidate;
   }
   return undefined;
@@ -152,10 +169,13 @@ function resolveProgramId(opts: {
     };
   }
 
-  // cluster=devnet only: grokchain-devnet defaults from json / explicit constant.
+  // cluster=devnet or mainnet-beta: deployed defaults from json / explicit constant.
   // Never applied on localnet. Never fall back to the local-only pair.
   const resolved =
-    value ?? (opts.cluster === "devnet" ? opts.deployedDefault : undefined);
+    value ??
+    (opts.cluster === "devnet" || opts.cluster === "mainnet-beta"
+      ? opts.deployedDefault
+      : undefined);
 
   if (!resolved) {
     throw new Error(WAITING_ON_CORE_AND_PROGRAMS);
@@ -186,6 +206,10 @@ export function loadConfig(): AppConfig {
     const auto = findDevnetConfigPath();
     if (auto) file = readJsonConfig(auto);
   }
+  if (!file && cluster === "mainnet-beta") {
+    const auto = findMainnetConfigPath();
+    if (auto) file = readJsonConfig(auto);
+  }
 
   const rpcUrl = (process.env.GROKCHAIN_RPC_URL ?? file?.rpcUrl ?? defaultRpc(cluster)).trim();
 
@@ -195,7 +219,8 @@ export function loadConfig(): AppConfig {
     envValue: process.env.GROKCHAIN_PROGRAM_ID,
     fileValue: file?.coreProgramId,
     localOnlyId: LOCAL_ONLY_PROGRAM_ID,
-    deployedDefault: DEVNET_CORE_PROGRAM_ID,
+    deployedDefault:
+      cluster === "mainnet-beta" ? MAINNET_CORE_PROGRAM_ID : DEVNET_CORE_PROGRAM_ID,
     label: "CORE",
   });
   const intents = resolveProgramId({
@@ -204,7 +229,10 @@ export function loadConfig(): AppConfig {
     envValue: process.env.GROKCHAIN_INTENTS_PROGRAM_ID,
     fileValue: file?.intentsProgramId,
     localOnlyId: LOCAL_ONLY_INTENTS_PROGRAM_ID,
-    deployedDefault: DEVNET_INTENTS_PROGRAM_ID,
+    deployedDefault:
+      cluster === "mainnet-beta"
+        ? MAINNET_INTENTS_PROGRAM_ID
+        : DEVNET_INTENTS_PROGRAM_ID,
     label: "INTENTS",
   });
 
@@ -243,12 +271,19 @@ export function clusterNotes(cfg: AppConfig): string[] {
         "Waiting on CORE and PROGRAMS for real deployed ids. Do not treat the local-only pair as live.",
       );
     } else {
+      const source =
+        cfg.cluster === "mainnet-beta" ? "grokchain-mainnet" : "grokchain-devnet";
       notes.push(
-        `CORE ${cfg.programId.toBase58()} and INTENTS ${cfg.intentsProgramId.toBase58()} came from the grokchain-devnet config / env and are treated as deployed. Still no seed export.`,
+        `CORE ${cfg.programId.toBase58()} and INTENTS ${cfg.intentsProgramId.toBase58()} came from the ${source} config / env and are treated as deployed. Still no seed export.`,
       );
       if (cfg.cluster === "devnet") {
         notes.push(
           `CORE ${cfg.programId.toBase58()} and INTENTS ${cfg.intentsProgramId.toBase58()} are the grokchain-devnet deployed programs. Still no seed export.`,
+        );
+      }
+      if (cfg.cluster === "mainnet-beta") {
+        notes.push(
+          `CORE ${cfg.programId.toBase58()} and INTENTS ${cfg.intentsProgramId.toBase58()} are the grokchain-mainnet deployed programs. Pay only. Still no seed export.`,
         );
       }
     }

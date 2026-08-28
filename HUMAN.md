@@ -1,6 +1,6 @@
 # HUMAN.md
 
-Short path on **devnet**: [GETTING-STARTED.md](./GETTING-STARTED.md) — `grokchain setup --devnet`. This file is the long form.
+Short path on **MAINNET**: [GETTING-STARTED.md](./GETTING-STARTED.md) — env block, not `setup --devnet`. DEVNET rehearsal still has `grokchain setup --devnet`. This file is the long form.
 
 This file is for the **human**, not the bot. The bot talks intents. The bot never sees a seed phrase or raw key. Keys live only on this host in `0600` files. Env vars name **paths**, not secrets.
 
@@ -9,7 +9,14 @@ On **localnet**, CORE and INTENTS default to the local-only validator pair. Thos
 - Local-only CORE (localnet only): `8WDhHSfrz6hMkmX7WteAAmyuWFLryHM2Kfc1r4k8EFXE`
 - Local-only INTENTS (localnet only): `AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2`
 
-On **devnet**, CORE and INTENTS are the grokchain-devnet deployed programs:
+On **MAINNET**, CORE and INTENTS are the pay-only deployed programs:
+
+- CORE: `44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd`
+  https://explorer.solana.com/address/44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd
+- INTENTS: `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw`
+  https://explorer.solana.com/address/3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw
+
+On **DEVNET** (rehearsal only), CORE and INTENTS are the old grokchain-devnet programs:
 
 - CORE: `7UtafKBBWNHEXC9PaNXu8USdZqL6VEWupsL7rS6LeVDj`
   https://explorer.solana.com/address/7UtafKBBWNHEXC9PaNXu8USdZqL6VEWupsL7rS6LeVDj?cluster=devnet
@@ -22,7 +29,7 @@ Human funds **two** vaults: SpendVault (pay source) and Paymaster (gas). Two dep
 
 Grant allowlist is **router mode**: allowlist the INTENTS program id for this cluster, not SystemProgram and not every inner DEX.
 
-On **devnet**, create/issue/revise/revoke/check_grant and pay/vaults are implemented clients against the real deployed ids. They land only if the human has rooted the account, issued a grant allowlisting the **devnet INTENTS** id `EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz`, funded SpendVault + Paymaster, and set `GROKCHAIN_RELAYER_KEYPAIR`. Otherwise `need_human_signature` / `need_human_setup`. `swap` / `deploy` / `call` are implemented clients in this source (grant-gated SOL send / deploy request / router call). They were not upgraded on the grokchain-devnet INTENTS binary in this change. Do not treat those ixs as live on public Solana until an explicit upgrade.
+On **MAINNET**, create/issue/revise/revoke/check_grant and pay/vaults are implemented clients against the real deployed ids. They land only if the human has rooted the account, issued a grant allowlisting the **MAINNET INTENTS** id `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw`, funded SpendVault + Paymaster, and set `GROKCHAIN_RELAYER_KEYPAIR`. Otherwise `need_human_signature` / `need_human_setup`. `swap` / `deploy` / `call` are not on this public INTENTS binary. Each root funds their own vault, paymaster, and relayer. Do not send SOL to `EcSnayFcwspNch8ChurzLwmg8zAsRPLtysUrf1QuPtXX` or `E8Pm8RG6L2qxLKTtMgYr8JQgJJtbRTzyKCdJRiPQSL1z`.
 
 ## 1. Install Solana CLI. Use your own wallet.
 
@@ -62,7 +69,30 @@ Local-only CORE id (not deployed, not devnet, not mainnet): `8WDhHSfrz6hMkmX7Wte
 Local-only INTENTS id (not deployed, not devnet, not mainnet): `AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2`
 
 
-## Devnet
+## MAINNET
+
+`GROKCHAIN_CLUSTER=mainnet-beta` plus `config/mainnet.json`, or `GROKCHAIN_CONFIG=/path/to/config/mainnet.json`. Env `GROKCHAIN_PROGRAM_ID` / `GROKCHAIN_INTENTS_PROGRAM_ID` override file values if set. There is no `setup --mainnet`. Do not use `setup --devnet` as the MAINNET path.
+
+Real MAINNET pay-only program ids:
+
+- CORE: `44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd`
+  Explorer: https://explorer.solana.com/address/44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd
+- INTENTS: `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw`
+  Explorer: https://explorer.solana.com/address/3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw
+
+```bash
+export GROKCHAIN_CLUSTER=mainnet-beta
+export GROKCHAIN_RPC_URL=https://api.mainnet-beta.solana.com
+export GROKCHAIN_PROGRAM_ID=44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd
+export GROKCHAIN_INTENTS_PROGRAM_ID=3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw
+export GROKCHAIN_ROOT_KEYPAIR="$HOME/.config/solana/id.json"
+export GROKCHAIN_AGENT_KEYPAIR="$HOME/.config/grokchain/agent.json"
+export GROKCHAIN_RELAYER_KEYPAIR="$HOME/.config/grokchain/relayer.json"
+```
+
+A bot `pay` on MAINNET **builds** against the real INTENTS id. It **lands** only after you complete the root / grant / vault / paymaster / relayer setup below. Missing any of those returns `need_human_signature` or `need_human_setup`. Do not fake a send. Each root funds their own vault, paymaster, and relayer. Do not send SOL to `EcSnayFcwspNch8ChurzLwmg8zAsRPLtysUrf1QuPtXX` or `E8Pm8RG6L2qxLKTtMgYr8JQgJJtbRTzyKCdJRiPQSL1z`.
+
+## DEVNET rehearsal
 
 `GROKCHAIN_CLUSTER=devnet` plus `config/devnet.json`, or `GROKCHAIN_CONFIG=/path/to/config/devnet.json`, or `grokchain --config config/devnet.json`. Env `GROKCHAIN_PROGRAM_ID` / `GROKCHAIN_INTENTS_PROGRAM_ID` override file values if set.
 
@@ -137,7 +167,15 @@ grokchain root issue-grant \
   --programs AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2 \
   --sponsor
 
-# devnet — real INTENTS id (the devnet router). Not the local-only AXprc... id.
+# MAINNET — real INTENTS id (the MAINNET router). Not the local-only AXprc... id.
+grokchain root issue-grant \
+  --agent "$(grokchain agent pubkey | python3 -c 'import sys,json; print(json.load(sys.stdin)["pubkey"])')" \
+  --cap 50000000 \
+  --expires 2000000000 \
+  --programs 3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw \
+  --sponsor
+
+# DEVNET rehearsal — real INTENTS id (the devnet router). Not the local-only AXprc... id.
 grokchain root issue-grant \
   --agent "$(grokchain agent pubkey | python3 -c 'import sys,json; print(json.load(sys.stdin)["pubkey"])')" \
   --cap 50000000 \
@@ -148,7 +186,9 @@ grokchain root issue-grant \
 
 `--programs AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2` is the **local-only INTENTS** program id (localnet only). Do not treat that id as live.
 
-`--programs EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz` is the **devnet INTENTS** program id (the devnet router). Allowlist this on devnet. Do not allowlist SystemProgram.
+`--programs 3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw` is the **MAINNET INTENTS** program id. Allowlist this on MAINNET. Do not allowlist SystemProgram.
+
+`--programs EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz` is the **DEVNET rehearsal INTENTS** program id. Allowlist this only on DEVNET. Do not allowlist SystemProgram.
 
 ## 7. Init and fund SpendVault (you pay). Pay source.
 
@@ -191,8 +231,10 @@ Cursor / MCP host config (stdio). Point env at **paths**:
       "command": "npx",
       "args": ["grokchain-mcp"],
       "env": {
-        "GROKCHAIN_CLUSTER": "devnet",
-        "GROKCHAIN_RPC_URL": "https://api.devnet.solana.com",
+        "GROKCHAIN_CLUSTER": "mainnet-beta",
+        "GROKCHAIN_RPC_URL": "https://api.mainnet-beta.solana.com",
+        "GROKCHAIN_PROGRAM_ID": "44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd",
+        "GROKCHAIN_INTENTS_PROGRAM_ID": "3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw",
         "GROKCHAIN_ROOT_KEYPAIR": "/absolute/path/to/id.json",
         "GROKCHAIN_AGENT_KEYPAIR": "/absolute/path/to/agent.json",
         "GROKCHAIN_RELAYER_KEYPAIR": "/absolute/path/to/relayer.json"
@@ -202,8 +244,8 @@ Cursor / MCP host config (stdio). Point env at **paths**:
 }
 ```
 
-For localnet, set `GROKCHAIN_CLUSTER` to `localnet` and `GROKCHAIN_RPC_URL` to `http://127.0.0.1:8899`.
+For DEVNET rehearsal, set `GROKCHAIN_CLUSTER` to `devnet` and `GROKCHAIN_RPC_URL` to `https://api.devnet.solana.com`. For localnet, set `GROKCHAIN_CLUSTER` to `localnet` and `GROKCHAIN_RPC_URL` to `http://127.0.0.1:8899`.
 
-`create_account` / `issue_grant` / `revise_grant` / `revoke_grant` still need the human root. `pay` / `swap` / `deploy` / `call` are implemented against INTENTS: the agent signs, the relayer is the fee payer, SpendVault is the SOL source when amount > 0. The bot never holds SOL. v1 swap is a grant-gated SOL send (not a DEX). v1 deploy is a request event (not a BPF deploy). v1 call is a grant-gated router (amount 0 = policy ping). This source was not upgraded on grokchain-devnet in the swap/deploy/call change.
+`create_account` / `issue_grant` / `revise_grant` / `revoke_grant` still need the human root. `pay` / `swap` / `deploy` / `call` are implemented against INTENTS: the agent signs, the relayer is the fee payer, SpendVault is the SOL source when amount > 0. The bot never holds SOL. v1 swap is a grant-gated SOL send (not a DEX). v1 deploy is a request event (not a BPF deploy). v1 call is a grant-gated router (amount 0 = policy ping). swap / deploy / call are not on this public INTENTS binary. Do not claim they are live on MAINNET.
 
 If a required keypair path is missing, or vaults / paymaster / grant are not set up, the tool returns `need_human_signature` or `need_human_setup` with an unsigned tx (base64) and a pointer back here. Never paste a seed into the bot. Never ask the bot for a key.

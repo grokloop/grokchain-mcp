@@ -1,21 +1,25 @@
-# Getting started on Grok Chain (devnet)
+# Getting started on Grok Chain (MAINNET)
 
-The human wallet is the only secret you keep. One command:
+Pay is live on Solana MAINNET. swap, deploy, and call are not on this public INTENTS binary. The human wallet is the only secret you keep. The bot never gets a seed.
+
+There is no setup --mainnet yet. Do not use setup --devnet as the MAINNET path. Set env, then run the MCP:
 
 ```bash
+export GROKCHAIN_CLUSTER=mainnet-beta
+export GROKCHAIN_RPC_URL=https://api.mainnet-beta.solana.com
+export GROKCHAIN_PROGRAM_ID=44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd
+export GROKCHAIN_INTENTS_PROGRAM_ID=3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw
 export GROKCHAIN_ROOT_KEYPAIR=$HOME/.config/solana/id.json
-npx -y github:grokloop/grokchain-mcp grokchain setup --devnet
+npx -y github:grokloop/grokchain-mcp
 ```
 
-That creates agent + relayer keystores (host files, mode 0600), tries a 1 SOL airdrop (prints the exact faucet step if the faucet is dry — it does not pretend it airdropped), creates the GrokAccount, issues a grant allowlisting the real **devnet INTENTS** router, and funds SpendVault + Paymaster from **your** wallet. It does **not** send a `pay`. After this, a Grok bot can call `pay`.
+`npx github:grokloop/grokchain-mcp` needs the binary name `grokchain` (CLI) or `grokchain-mcp` (stdio MCP server).
 
-`npx github:grokloop/grokchain-mcp` needs the binary name `grokchain` (setup CLI). The package also ships `grokchain-mcp` for the stdio MCP server.
-
-Equivalent: `grokchain setup --devnet` or `grokchain setup devnet`. Optional `--yes` skips prompts.
+Each root funds their own vault, paymaster, and relayer. Do not send SOL to `EcSnayFcwspNch8ChurzLwmg8zAsRPLtysUrf1QuPtXX` or `E8Pm8RG6L2qxLKTtMgYr8JQgJJtbRTzyKCdJRiPQSL1z`. Those are the first test mouth, not a public treasury or paymaster.
 
 ## MCP snippet (Grok Bot / Grok Build)
 
-Env names **PATHS**, never seeds or key bytes. `setup --devnet` prints this with the actual absolute paths from that run:
+Env names **PATHS**, never seeds or key bytes.
 
 ```json
 {
@@ -24,7 +28,10 @@ Env names **PATHS**, never seeds or key bytes. `setup --devnet` prints this with
       "command": "npx",
       "args": ["-y", "github:grokloop/grokchain-mcp", "grokchain-mcp"],
       "env": {
-        "GROKCHAIN_CLUSTER": "devnet",
+        "GROKCHAIN_CLUSTER": "mainnet-beta",
+        "GROKCHAIN_RPC_URL": "https://api.mainnet-beta.solana.com",
+        "GROKCHAIN_PROGRAM_ID": "44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd",
+        "GROKCHAIN_INTENTS_PROGRAM_ID": "3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw",
         "GROKCHAIN_ROOT_KEYPAIR": "/abs/path/to/id.json",
         "GROKCHAIN_AGENT_KEYPAIR": "/home/USER/.config/grokchain/agent.json",
         "GROKCHAIN_RELAYER_KEYPAIR": "/home/USER/.config/grokchain/relayer.json"
@@ -34,48 +41,37 @@ Env names **PATHS**, never seeds or key bytes. `setup --devnet` prints this with
 }
 ```
 
-one-liner:
-
-```bash
-GROKCHAIN_CLUSTER=devnet GROKCHAIN_ROOT_KEYPAIR=$HOME/.config/solana/id.json grokchain setup --devnet
-```
-
 ## Rules
 
 - Human wallet (`GROKCHAIN_ROOT_KEYPAIR`, default `~/.config/solana/id.json`) is the only secret you keep.
 - Agent and relayer are host files mode `0600`. Reused if they already exist. Never overwrite.
 - Never paste a seed into a bot. Never ask a bot for a key.
 - Relayer pays fees. Human funds vaults. Bot never holds SOL.
-- CORE / INTENTS ids are the real grokchain-devnet programs:
-  - CORE `7UtafKBBWNHEXC9PaNXu8USdZqL6VEWupsL7rS6LeVDj`
-    https://explorer.solana.com/address/7UtafKBBWNHEXC9PaNXu8USdZqL6VEWupsL7rS6LeVDj?cluster=devnet
-  - INTENTS `EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz`
-    https://explorer.solana.com/address/EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz?cluster=devnet
-- Local-only ids `8WDhHSfrz6hMkmX7WteAAmyuWFLryHM2Kfc1r4k8EFXE` and `AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2` are refused on devnet.
-- `swap` / `deploy` / `call` are implemented clients in this source. They were not upgraded on the grokchain-devnet INTENTS binary in this change. Do not claim they are live on public Solana.
+- CORE / INTENTS ids on **MAINNET** (pay only):
+  - CORE `44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd`
+    https://explorer.solana.com/address/44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd
+  - INTENTS `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw`
+    https://explorer.solana.com/address/3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw
+
+- Grant allowlist on MAINNET is the INTENTS id `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw`.
+- Token CA `2x4iY5AaiGyRfxzHzSY1KzQJ7K82SDqmkMApwbcRpump` is a mint, not these programs.
+- Local-only ids `8WDhHSfrz6hMkmX7WteAAmyuWFLryHM2Kfc1r4k8EFXE` and `AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2` are refused off localnet.
+- `swap` / `deploy` / `call` are not on this public INTENTS binary. Do not claim they are live on MAINNET.
 
 Long form (every step by hand): [HUMAN.md](./HUMAN.md).
 
-## Install
+## DEVNET rehearsal
 
-Use GitHub. The binary is grokchain.
+DEVNET still exists on the old ids if you want to rehearse. Not the MAINNET path.
 
 ```bash
+export GROKCHAIN_ROOT_KEYPAIR=$HOME/.config/solana/id.json
 npx -y github:grokloop/grokchain-mcp grokchain setup --devnet
 ```
 
-Or clone and build:
+DEVNET CORE `7UtafKBBWNHEXC9PaNXu8USdZqL6VEWupsL7rS6LeVDj` · INTENTS `EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz`.
 
-```bash
-git clone https://github.com/grokloop/grokchain-mcp
-```
+## Install
 
-Or clone the repo, install dependencies, run the TypeScript build, then node dist/cli.js setup --devnet.
-
-Idempotent: safe to re-run. Existing keystores, account, grant, and vaults are reused or topped up.
-
-Exact clone path:
-
-```bash
-git clone https://github.com/grokloop/grokchain-mcp && cd grokchain-mcp && npm i && npm run build && node dist/cli.js setup --devnet
-```
+Use GitHub. Same MAINNET env as the top of this file, then run the MCP package.
+Or clone the repo, install deps, build, then set the MAINNET env. Idempotent: existing keystores are reused.

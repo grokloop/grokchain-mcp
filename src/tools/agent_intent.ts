@@ -74,14 +74,18 @@ export async function submitAgentIntent(opts: {
     const ctx = openCtx(opts.raw);
     refuseBannedIntentsOnPublicCluster(ctx.cfg);
     const rootPk = resolveRootPubkey(ctx, opts.raw.root);
-    if (!rootPk) return missingRoot(ctx, { intent: opts.intent });
+    // extraFields carries the honesty flags (moved_sol, venue, pool...). Dropping
+    // them here hides exactly the facts a bot needs when told to fix its setup.
+    if (!rootPk) {
+      return missingRoot(ctx, { intent: opts.intent, moved_sol: false, ...opts.extraFields });
+    }
 
     const agentPk = ctx.agent.pubkey;
     if (!agentPk) {
       return needHumanSetup(
         ctx.cfg,
         `GROKCHAIN_AGENT_KEYPAIR is missing. Agent signs ${opts.intent} as a public identity. The bot never holds SOL and never is the fee payer.`,
-        { intent: opts.intent, root: rootPk.toBase58() },
+        { intent: opts.intent, root: rootPk.toBase58(), moved_sol: false, ...opts.extraFields },
       );
     }
 

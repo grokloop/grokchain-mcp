@@ -14,6 +14,7 @@ import { pumpBuyTool } from "./tools/pump_buy.js";
 import { pumpSellTool } from "./tools/pump_sell.js";
 import { pumpCreateTool } from "./tools/pump_create.js";
 import { pumpAmmBuyTool } from "./tools/pump_amm_buy.js";
+import { pumpAmmDeriveTool } from "./tools/pump_amm_derive.js";
 import { pumpAmmSellTool } from "./tools/pump_amm_sell.js";
 import { getAccountTool, getGrantTool } from "./tools/reads.js";
 import { reviseGrantTool } from "./tools/revise_grant.js";
@@ -158,6 +159,7 @@ function buildServer(): McpServer {
       remaining_accounts: z
         .array(z.union([pubkey, z.object({ pubkey, isSigner: z.boolean().optional(), isWritable: z.boolean().optional() })]))
         .describe("Official buy_v2 account list (27). user slot (13) must be the pump-trader PDA, not SpendVault. Last account must be pump.fun."),
+      venue: z.enum(["auto", "curve", "amm"]).optional().describe('auto (default) probes the curve complete flag and returns CoinGraduated naming pump_amm_buy if graduated. "curve" forces the old path. "amm" rejects.'),
       sponsor_lamports: z
         .union([z.number().int().nonnegative(), z.string()])
         .optional(),
@@ -182,6 +184,7 @@ function buildServer(): McpServer {
       remaining_accounts: z
         .array(z.union([pubkey, z.object({ pubkey, isSigner: z.boolean().optional(), isWritable: z.boolean().optional() })]))
         .describe("Official sell_v2 account list (26). user slot (13) must be the pump-trader PDA, not SpendVault. Last account must be pump.fun."),
+      venue: z.enum(["auto", "curve", "amm"]).optional().describe('auto (default) probes the curve complete flag and returns CoinGraduated naming pump_amm_sell if graduated. "curve" forces the old path. "amm" rejects.'),
       sponsor_lamports: z
         .union([z.number().int().nonnegative(), z.string()])
         .optional(),
@@ -218,8 +221,19 @@ function buildServer(): McpServer {
   );
 
   server.tool(
+    "pump_amm_derive",
+    "Read-only. Resolve a coin's PumpSwap pool and build the ordered account list this vault's pump-trader would use. pump_amm_buy/sell call the same builder internally when remaining_accounts is omitted, so you rarely need this — use it to inspect what would be submitted. Signs nothing.",
+    {
+      mint: pubkey.optional().describe("Base mint. Defaults to the documented Grok token CA."),
+      kind: z.enum(["buy", "sell"]).optional().describe("Which list to build. Default buy."),
+      root: pubkey.optional(),
+    },
+    async (args) => jsonResult(await pumpAmmDeriveTool(args)),
+  );
+
+  server.tool(
     "pump_amm_buy",
-    "Tight INTENTS PumpSwap buy_exact_quote_in adapter. Grant-gated. Live on MAINNET INTENTS 3HCErAF. Pump-trader PDA is remaining[1] user. SpendVault is never user. remaining_accounts must be official PumpSwap buy list 26 (non-cashback) or 27 (cashback). Do not use sell's 24. Agent signs. Relayer fee-pays. Agent stays 0 SOL. Not a general router. Not Jupiter. Curve pump_buy cannot hit a graduated mint.",
+    "Tight INTENTS PumpSwap buy_exact_quote_in adapter. Grant-gated. Live on MAINNET INTENTS 3HCErAF. Pump-trader PDA is remaining[1] user. SpendVault is never user. remaining_accounts is OPTIONAL — omit it and the list is built from chain state for this vault's pump-trader. If supplied it must be the official PumpSwap buy list 26 (non-cashback) or 27 (cashback). Do not use sell's 24. Agent signs. Relayer fee-pays. Agent stays 0 SOL. Not a general router. Not Jupiter. Curve pump_buy cannot hit a graduated mint.",
     {
       mint: pubkey.optional().describe("Base mint. Defaults to the documented Grok token CA (Token-2022)."),
       spendable_quote_in: z
@@ -235,7 +249,8 @@ function buildServer(): McpServer {
         .describe("Grant SOL budget. Must be >= spendable_quote_in. Defaults to spendable_quote_in."),
       remaining_accounts: z
         .array(z.union([pubkey, z.object({ pubkey, isSigner: z.boolean().optional(), isWritable: z.boolean().optional() })]))
-        .describe("Official PumpSwap buy list (26 or 27). user slot (1) must be the pump-trader PDA, not SpendVault. remaining[16] must be PumpSwap."),
+        .optional()
+        .describe("OPTIONAL. Official PumpSwap buy list (26 or 27). Omit to build from chain for this vault's pump-trader. If supplied, user slot (1) must be the pump-trader PDA, not SpendVault. remaining[16] must be PumpSwap."),
       sponsor_lamports: z
         .union([z.number().int().nonnegative(), z.string()])
         .optional(),
@@ -247,7 +262,7 @@ function buildServer(): McpServer {
 
   server.tool(
     "pump_amm_sell",
-    "Tight INTENTS PumpSwap sell adapter. Live on MAINNET INTENTS 3HCErAF. Grant amount is 0 (tokens out, not SOL). Pump-trader PDA is remaining[1] user. remaining_accounts must be official PumpSwap sell list 24 (no volume accs). Do not pass buy's 26/27. Quote unwrap stays on the trader, not the vault. Agent stays 0 SOL. Not a general router. Not Jupiter.",
+    "Tight INTENTS PumpSwap sell adapter. Live on MAINNET INTENTS 3HCErAF. Grant amount is 0 (tokens out, not SOL). Pump-trader PDA is remaining[1] user. remaining_accounts is OPTIONAL — omit it and the list is built from chain state for this vault's pump-trader. If supplied it must be the official PumpSwap sell list 24 (no volume accs). Do not pass buy's 26/27. Quote unwrap stays on the trader, not the vault. Agent stays 0 SOL. Not a general router. Not Jupiter.",
     {
       mint: pubkey.optional().describe("Base mint. Defaults to the documented Grok token CA (Token-2022)."),
       base_amount_in: z
@@ -259,7 +274,8 @@ function buildServer(): McpServer {
         .describe("Minimum quote (lamports) after fees. 0 = accept any."),
       remaining_accounts: z
         .array(z.union([pubkey, z.object({ pubkey, isSigner: z.boolean().optional(), isWritable: z.boolean().optional() })]))
-        .describe("Official PumpSwap sell list (24). user slot (1) must be the pump-trader PDA, not SpendVault. remaining[16] must be PumpSwap. Do not pass buy's 26."),
+        .optional()
+        .describe("OPTIONAL. Official PumpSwap sell list (24). Omit to build from chain for this vault's pump-trader. If supplied, user slot (1) must be the pump-trader PDA, not SpendVault. remaining[16] must be PumpSwap. Do not pass buy's 26."),
       sponsor_lamports: z
         .union([z.number().int().nonnegative(), z.string()])
         .optional(),

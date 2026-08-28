@@ -109,3 +109,21 @@ When you describe a grant or an approval, show:
 - `amount_lamports` and `sponsor_lamports` on each pay
 
 Do not show, request, or log seed material.
+
+## Graduated coins: which mouth, and who builds the list
+
+A pump.fun coin leaves its bonding curve when the curve completes. After that
+`buy_v2` / `sell_v2` fail. **$GrokChain is already graduated.**
+
+- `pump_buy` / `pump_sell` — bonding curve only. If the coin graduated these now
+  stop with `CoinGraduated` and name the tool to use. They do **not** burn a
+  transaction finding out. Pass `venue:"curve"` to force the old behaviour.
+- `pump_amm_buy` / `pump_amm_sell` — PumpSwap, for graduated coins.
+  **You do not build `remaining_accounts`.** Omit it and the list is resolved
+  from chain state for this vault's pump-trader. Only supply one to override.
+  Quote is WSOL. Fund the trader with `fund_pump_trader`. Buy remaining 26
+  (or 27 cashback) / sell remaining 24. Not Jupiter. There is no wrap_sol /
+  unwrap_sol intent on this binary.
+- `pump_amm_derive` — read-only; shows the pool and the exact list.
+
+Report the `venue` and `pool` from the result so the human knows which mouth ran.

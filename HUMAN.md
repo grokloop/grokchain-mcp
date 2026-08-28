@@ -98,7 +98,7 @@ Same env as pay. `init_pump_trader` once (root). Grant cap and SpendVault must c
 
 ### MAINNET pump_amm
 
-Same env as pay. Grant-gated PumpSwap. Trader is remaining[1] only. Vault is never user. Buy remaining 26 (or 27 cashback). Sell remaining 24 (no volume accs). Do not pass buy's 26 to sell. Buy needs `fund_pump_trader` so the trader holds spendable quote. Sell grant amount is 0. Quote unwrap stays on the trader, not the vault. Agent stays 0 SOL. Not Jupiter.
+Same env as pay. Grant-gated PumpSwap. Trader is remaining[1] only. Vault is never user. Buy remaining 26 (or 27 cashback). Sell remaining 24 (no volume accs). Do not pass buy's 26 to sell. `remaining_accounts` is optional — omit it and the list is built from chain for this vault's pump-trader. Buy needs `fund_pump_trader` so the trader holds spendable WSOL quote. Sell grant amount is 0. Quote unwrap stays on the trader, not the vault. Agent stays 0 SOL. Not Jupiter. There is no wrap_sol/unwrap_sol intent.
 
 
 
@@ -259,3 +259,37 @@ For DEVNET rehearsal, set `GROKCHAIN_CLUSTER` to `devnet` and `GROKCHAIN_RPC_URL
 `create_account` / `issue_grant` / `revise_grant` / `revoke_grant` still need the human root. `pay` / `swap` / `deploy` / `call` are implemented against INTENTS: the agent signs, the relayer is the fee payer, SpendVault is the SOL source when amount > 0. The bot never holds SOL. v1 swap is a grant-gated SOL send (not a DEX). v1 deploy is a request event (not a BPF deploy). v1 call is a grant-gated router (amount 0 = policy ping). swap / deploy / call are not on this public INTENTS binary. Do not claim they are live on MAINNET.
 
 If a required keypair path is missing, or vaults / paymaster / grant are not set up, the tool returns `need_human_signature` or `need_human_setup` with an unsigned tx (base64) and a pointer back here. Never paste a seed into the bot. Never ask the bot for a key.
+
+## Post-bond coins: you no longer build the account list
+
+`pump_amm_buy` / `pump_amm_sell` trade a **graduated** coin on PumpSwap.
+`$GrokChain` is graduated — its bonding curve reads `complete = 1` with no SOL
+left — so the curve path cannot buy it.
+
+`remaining_accounts` is now **optional**. Omit it and the list is resolved from
+chain state for your vault's pump-trader:
+
+- the pool is derived (`["pool", 0, pool-authority, base, quote]`) and confirmed
+  on chain, then decoded for the pool token accounts and `coin_creator`;
+- your trader's ATAs are derived using **the mint's own token program** —
+  `$GrokChain` is Token-2022, and deriving with the classic program silently
+  produces the wrong account;
+- the venue-global slots (fee recipients, event authority, fee config) are copied
+  from a recent successful trade on the same pool, so pump.fun's own rotation is
+  followed rather than guessed, and any accounts pump.fun appends are picked up
+  automatically.
+
+`pump_amm_derive` shows you exactly what would be submitted, and signs nothing.
+
+`pump_buy` / `pump_sell` now check the curve first and stop with `CoinGraduated`
+naming the tool to use, instead of spending a transaction to discover it.
+
+Honest facts before funding:
+
+- **The AMM's quote leg is WSOL, not native SOL.** `fund_pump_trader` is the
+  live INTENTS ix that puts spendable quote on the trader. There is no
+  `wrap_sol` / `unwrap_sol` intent on this binary. Do not invent one.
+- **Buy remaining is 26 (or 27 cashback). Sell remaining is 24.** Do not pass
+  buy's 26 to sell. Not Jupiter.
+- Size the **grant cap** to what you can lose. Quote unwrap stays on the trader,
+  not the vault. Agent stays 0 SOL.

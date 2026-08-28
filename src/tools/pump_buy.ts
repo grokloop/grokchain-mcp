@@ -5,6 +5,7 @@ import { parsePubkey } from "../keys.js";
 import { toBigInt, validatePumpBuy } from "../policy.js";
 import { asError } from "../resolve.js";
 import { parseOptionalRemaining, submitAgentIntent } from "./agent_intent.js";
+import { guardCurveVenue } from "./venue_guard.js";
 import type { ToolResult } from "../types.js";
 
 /**
@@ -22,6 +23,8 @@ export async function pumpBuyTool(
     remaining_accounts?: unknown;
     root?: string;
     dry_run?: boolean;
+    /** "auto" (default) probes the curve; "curve" forces it; "amm" rejects. */
+    venue?: string;
   } = {},
 ): Promise<ToolResult> {
   try {
@@ -31,6 +34,11 @@ export async function pumpBuyTool(
     const mint = args.mint ? parsePubkey(args.mint, "mint") : new PublicKey(GROK_TOKEN_MINT);
     const remaining = parseOptionalRemaining(args.remaining_accounts);
     const { warnings } = validatePumpBuy({ amount, maxSolCost, sponsorLamports: sponsor });
+
+    // A graduated coin cannot trade on the curve: buy_v2/sell_v2 fail and the
+    // transaction is wasted. Probe the curve's `complete` flag first.
+    const routed = await guardCurveVenue(mint, "pump_buy", "pump_amm_buy", args.venue);
+    if (routed) return routed;
 
     return await submitAgentIntent({
       raw: args,

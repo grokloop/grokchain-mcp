@@ -82,6 +82,20 @@ export const PUMP_DISC = {
   create_v2: Buffer.from([0xd6, 0x90, 0x4c, 0xec, 0x5f, 0x8b, 0x31, 0xb4]),
 } as const;
 
+/** wSOL: PumpSwap's quote asset for pump coins. */
+export const WSOL_MINT = "So11111111111111111111111111111111111111112";
+export const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+export const ASSOCIATED_TOKEN_PROGRAM_ID = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
+
+/**
+ * BondingCurve layout, decoded from a live mainnet account:
+ * disc(8) + 5 x u64 + complete(1) + creator(32). complete === 1 means the coin
+ * graduated and must be traded on the AMM instead.
+ */
+export const BONDING_CURVE_DISCRIMINATOR = Buffer.from([23, 183, 248, 55, 96, 216, 172, 96]);
+export const BONDING_CURVE_COMPLETE_OFFSET = 48;
+export const BONDING_CURVE_CREATOR_OFFSET = 49;
+
 export const PUMP_BUY_V2_ACCOUNT_COUNT = 27;
 export const PUMP_SELL_V2_ACCOUNT_COUNT = 26;
 export const PUMP_USER_INDEX = 13;

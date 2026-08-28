@@ -204,3 +204,30 @@ export function encodePumpCreateV2Inner(opts: {
   ]);
 }
 
+/** Borsh PumpAmmBuyArgs: u64 spendable_quote_in + u64 min_base_amount_out + u64 max_sol_cost + u64 sponsor */
+export function encodePumpAmmBuyArgs(args: {
+  spendableQuoteIn: bigint | number | string;
+  minBaseAmountOut: bigint | number | string;
+  maxSolCost: bigint | number | string;
+  sponsorLamports: bigint | number | string;
+}): Buffer {
+  return Buffer.concat([
+    encodeU64(args.spendableQuoteIn),
+    encodeU64(args.minBaseAmountOut),
+    encodeU64(args.maxSolCost),
+    encodeU64(args.sponsorLamports),
+  ]);
+}
+
+/** Borsh PumpAmmSellArgs: u64 base_amount_in + u64 min_quote_amount_out + u64 sponsor */
+export function encodePumpAmmSellArgs(args: {
+  baseAmountIn: bigint | number | string;
+  minQuoteAmountOut: bigint | number | string;
+  sponsorLamports: bigint | number | string;
+}): Buffer {
+  return Buffer.concat([
+    encodeU64(args.baseAmountIn),
+    encodeU64(args.minQuoteAmountOut),
+    encodeU64(args.sponsorLamports),
+  ]);
+}

@@ -8,7 +8,7 @@ On **localnet**, CORE and INTENTS default to the local-only validator pair
 They are not a deployed program. They are not on devnet. They are not on
 mainnet. Do not treat them as live.
 
-On **MAINNET**, CORE and INTENTS are the deployed programs (pay + pump + call + deploy):
+On **MAINNET**, CORE and INTENTS are the deployed programs (pay + pump + pump_amm + call + deploy):
 
 - CORE: `44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd`
   https://explorer.solana.com/address/44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd
@@ -44,6 +44,7 @@ Chain pays.
 | deploy | implemented INTENTS client. check_grant(0) + DeployRequested. **Not a BPF deploy. No ELF.** **MAINNET**: live as a grant event. |
 | call | implemented INTENTS client. amount 0 = policy ping. amount > 0 debits SpendVault. remaining empty = grant-checked only. **MAINNET**: live. |
 | pump_buy / pump_sell / pump_create | implemented INTENTS client. Official pump.fun buy_v2 / sell_v2 / create_v2. Trader PDA is user. Vault is never user. **MAINNET**: live on 3HCErAF. 27-account buy needs v0 + ALT on public RPC. Complete bonding curves cannot buy_v2. |
+| pump_amm_buy / pump_amm_sell | implemented INTENTS client. Grant-gated PumpSwap (post-graduation). Trader is remaining[1] only. Vault is never user. Buy remaining 26 (or 27 cashback). Sell remaining 24 (no volume accs). Do not pass buy's 26 to sell. Agent stays 0 SOL. Quote unwrap stays on the trader, not the vault. **MAINNET**: live on 3HCErAF. Not Jupiter. |
 
 Optional read-only: get_account, get_grant.
 
@@ -64,7 +65,7 @@ Real MAINNET program ids:
 
 There is no `setup --mainnet`. Do not use `setup --devnet` as the MAINNET path. Each root funds their own vault, paymaster, and relayer. Do not send SOL to `EcSnayFcwspNch8ChurzLwmg8zAsRPLtysUrf1QuPtXX` or `E8Pm8RG6L2qxLKTtMgYr8JQgJJtbRTzyKCdJRiPQSL1z`.
 
-On **MAINNET**, create/issue/revise/revoke/check_grant, pay/vaults, pump_buy/sell/create, call, and deploy are implemented clients against the real deployed ids. They land only if the human has rooted the account, issued a grant allowlisting the **MAINNET INTENTS** id `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw`, funded SpendVault + Paymaster, and set RELAYER_KEYPAIR. Otherwise need_human_signature / need_human_setup. deploy is a grant event, not an ELF upload. swap is SOL min_out, not an AMM.
+On **MAINNET**, create/issue/revise/revoke/check_grant, pay/vaults, pump_buy/sell/create, pump_amm_buy/sell, call, and deploy are implemented clients against the real deployed ids. They land only if the human has rooted the account, issued a grant allowlisting the **MAINNET INTENTS** id `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw`, funded SpendVault + Paymaster, and set RELAYER_KEYPAIR. Otherwise need_human_signature / need_human_setup. deploy is a grant event, not an ELF upload. swap is SOL min_out, not an AMM.
 
 ## DEVNET rehearsal
 

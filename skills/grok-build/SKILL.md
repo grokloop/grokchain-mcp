@@ -22,6 +22,8 @@ Use these names. Do not drop to raw Solana unless the human asked you to debug.
 | `swap` | agent signs; relayer fee-pays | Grant-gated SOL send with min_out. Not a DEX. Not Jupiter. Not SPL. |
 | `deploy` | agent signs; relayer fee-pays | check_grant(0) + DeployRequested. Not a BPF deploy. No ELF. |
 | `call` | agent signs; relayer fee-pays | Grant-gated router. amount 0 = policy ping. CORE allowlists INTENTS, not the inner target. |
+| `pump_buy` / `pump_sell` / `pump_create` | agent signs; relayer fee-pays | Official pump.fun curve. Trader PDA is user. Vault never user. Live on MAINNET. Complete curves cannot buy_v2. |
+| `pump_amm_buy` / `pump_amm_sell` | agent signs; relayer fee-pays | Grant-gated PumpSwap. Live on MAINNET. Trader is remaining[1]. Vault never user. Buy remaining 26. Sell remaining 24. Agent stays 0 SOL. Not Jupiter. |
 | `get_account` / `get_grant` | none | Optional reads |
 
 ## CORE + INTENTS by cluster
@@ -30,8 +32,11 @@ Use these names. Do not drop to raw Solana unless the human asked you to debug.
 - **devnet**: CORE `7UtafKBBWNHEXC9PaNXu8USdZqL6VEWupsL7rS6LeVDj` and INTENTS `EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz` are the grokchain-devnet deployed programs.
   - CORE explorer: https://explorer.solana.com/address/7UtafKBBWNHEXC9PaNXu8USdZqL6VEWupsL7rS6LeVDj?cluster=devnet
   - INTENTS explorer: https://explorer.solana.com/address/EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz?cluster=devnet
+- **mainnet-beta**: CORE `44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd` and INTENTS `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw` (pay + pump + pump_amm + call + deploy).
+  - CORE explorer: https://explorer.solana.com/address/44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd
+  - INTENTS explorer: https://explorer.solana.com/address/3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw
 - Do not invent a program id.
-- Never use the local-only pair on devnet. Config refuses them.
+- Never use the local-only pair on devnet or mainnet. Config refuses them.
 
 On **devnet**, `create_account` / `issue_grant` / `revise_grant` / `revoke_grant` / `check_grant` and `pay` / vaults are implemented clients against the real deployed ids. They land only if the human has rooted the account, issued a grant allowlisting the **devnet INTENTS** id `EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz`, funded SpendVault + Paymaster, and set `GROKCHAIN_RELAYER_KEYPAIR`. Otherwise `need_human_signature` / `need_human_setup`. Do not fake a send.
 

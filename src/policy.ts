@@ -298,3 +298,62 @@ export function validatePumpCreate(args: {
   };
 }
 
+export function validatePumpAmmBuy(args: {
+  spendableQuoteIn: bigint;
+  minBaseAmountOut: bigint;
+  maxSolCost: bigint;
+  sponsorLamports: bigint;
+}): { warnings: string[] } {
+  if (args.spendableQuoteIn <= 0n) {
+    throw new PolicyError("ZeroAmount", "pump_amm_buy spendable_quote_in must be greater than zero");
+  }
+  if (args.maxSolCost <= 0n) {
+    throw new PolicyError("ZeroAmount", "pump_amm_buy max_sol_cost must be greater than zero (grant SOL budget)");
+  }
+  if (args.maxSolCost < args.spendableQuoteIn) {
+    throw new PolicyError("ZeroAmount", "pump_amm_buy max_sol_cost must be >= spendable_quote_in");
+  }
+  if (args.sponsorLamports > BigInt(MAX_SPONSOR_LAMPORTS)) {
+    throw new PolicyError(
+      "SponsorCapExceeded",
+      `sponsor_lamports exceeds MAX_SPONSOR_LAMPORTS (${MAX_SPONSOR_LAMPORTS})`,
+    );
+  }
+  void args.minBaseAmountOut;
+  return {
+    warnings: [
+      "pump_amm_buy is a tight INTENTS adapter for official PumpSwap buy_exact_quote_in. Not a general router. Not Jupiter.",
+      "Grant cap is max_sol_cost (SOL spent). Pump-trader PDA is remaining[1] user. SpendVault is never user.",
+      "remaining_accounts must be official PumpSwap buy list: 26 (non-cashback) or 27 (cashback). Do not use sell's 24.",
+      "Trader must be pre-funded (fund_pump_trader). Adapter wraps quote onto trader WSOL ATA. Leftover native SOL stays on the trader.",
+      "Live on MAINNET INTENTS 3HCErAF. Curve pump_buy cannot hit a graduated mint. Use this ix after graduation.",
+      "Agent stays 0 SOL. Relayer fee-pays. Bot never holds SOL.",
+    ],
+  };
+}
+
+export function validatePumpAmmSell(args: {
+  baseAmountIn: bigint;
+  minQuoteAmountOut: bigint;
+  sponsorLamports: bigint;
+}): { warnings: string[] } {
+  if (args.baseAmountIn <= 0n) {
+    throw new PolicyError("ZeroAmount", "pump_amm_sell base_amount_in must be greater than zero");
+  }
+  void args.minQuoteAmountOut;
+  if (args.sponsorLamports > BigInt(MAX_SPONSOR_LAMPORTS)) {
+    throw new PolicyError(
+      "SponsorCapExceeded",
+      `sponsor_lamports exceeds MAX_SPONSOR_LAMPORTS (${MAX_SPONSOR_LAMPORTS})`,
+    );
+  }
+  return {
+    warnings: [
+      "pump_amm_sell is a tight INTENTS adapter for official PumpSwap sell. Grant amount is 0 (tokens out, not SOL).",
+      "Pump-trader PDA is remaining[1] user. SpendVault is never user. Agent signs; relayer fee-pays.",
+      "remaining_accounts must be official PumpSwap sell list: 24 (no volume accs). Do not pass buy's 26/27 — that shifts fee_config.",
+      "Quote unwrap stays on the trader, not the vault. Agent stays 0 SOL. Not Jupiter.",
+      "Live on MAINNET INTENTS 3HCErAF.",
+    ],
+  };
+}

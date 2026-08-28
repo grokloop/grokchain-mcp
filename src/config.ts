@@ -34,7 +34,7 @@ const BANNED_LOCAL_ONLY_IDS = new Set([
 const MAINNET_CORE_PROGRAM_ID =
   "44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd";
 
-/** MAINNET deployed INTENTS (pay + pump + call + deploy). Used only when cluster=mainnet-beta. */
+/** MAINNET deployed INTENTS (pay + pump + pump_amm + call + deploy). Used only when cluster=mainnet-beta. */
 const MAINNET_INTENTS_PROGRAM_ID =
   "3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw";
 
@@ -283,7 +283,7 @@ export function clusterNotes(cfg: AppConfig): string[] {
       }
       if (cfg.cluster === "mainnet-beta") {
         notes.push(
-          `CORE ${cfg.programId.toBase58()} and INTENTS ${cfg.intentsProgramId.toBase58()} are the grokchain-mainnet deployed programs. pay + pump + call + deploy. deploy is a grant event, not ELF upload. swap is SOL min_out, not AMM. Still no seed export.`,
+          `CORE ${cfg.programId.toBase58()} and INTENTS ${cfg.intentsProgramId.toBase58()} are the grokchain-mainnet deployed programs. pay + pump + pump_amm_buy/sell + call + deploy. deploy is a grant event, not ELF upload. swap is SOL min_out, not AMM. pump_amm is grant-gated PumpSwap. Still no seed export.`,
         );
       }
     }

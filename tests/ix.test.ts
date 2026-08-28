@@ -7,10 +7,11 @@ import {
   LOCAL_ONLY_INTENTS_PROGRAM_ID,
   LOCAL_ONLY_PROGRAM_ID,
   MAX_SPONSOR_LAMPORTS,
+  PUMP_AMM_PROGRAM_ID,
   PUMP_DISC,
   PUMP_PROGRAM_ID,
 } from "../src/constants.js";
-import { buildCallIx, buildDeployIx, buildInitPaymasterIx, buildInitSpendVaultIx, buildPayIx, buildPumpBuyIx, buildPumpSellIx, buildSwapIx } from "../src/intents.js";
+import { buildCallIx, buildDeployIx, buildInitPaymasterIx, buildInitSpendVaultIx, buildPayIx, buildPumpAmmBuyIx, buildPumpAmmSellIx, buildPumpBuyIx, buildPumpSellIx, buildSwapIx } from "../src/intents.js";
 import { grantPda, grokAccountPda, paymasterPda, pumpTraderPda, spendVaultPda } from "../src/pda.js";
 import {
   buildCheckGrantIx,
@@ -19,7 +20,7 @@ import {
   buildReviseGrantIx,
   buildRevokeGrantIx,
 } from "../src/core.js";
-import { encodeCallArgs, encodeDeployArgs, encodeGrantPolicyArgs, encodePayArgs, encodePumpBuyArgs, encodePumpBuyV2Inner, encodePumpSellArgs, encodeSwapArgs } from "../src/encode.js";
+import { encodeCallArgs, encodeDeployArgs, encodeGrantPolicyArgs, encodePayArgs, encodePumpAmmBuyArgs, encodePumpAmmSellArgs, encodePumpBuyArgs, encodePumpBuyV2Inner, encodePumpSellArgs, encodeSwapArgs } from "../src/encode.js";
 
 const PROGRAM = new PublicKey(LOCAL_ONLY_PROGRAM_ID);
 const ROOT = new PublicKey("11111111111111111111111111111111");
@@ -385,4 +386,100 @@ test("pump_buy discriminator and args; user must be trader; target != pump fails
     remainingAccounts: sellRemaining,
   });
   assert.deepEqual(Array.from(sold.ix.data.subarray(0, 8)), Array.from(INTENTS_DISC.pump_sell));
+});
+
+test("pump_amm_buy/sell discriminators, remaining counts, trader is remaining[1]", () => {
+  assert.deepEqual(Array.from(INTENTS_DISC.pump_amm_buy), [129, 59, 179, 195, 110, 135, 61, 2]);
+  assert.deepEqual(Array.from(INTENTS_DISC.pump_amm_sell), [238, 234, 142, 38, 107, 206, 76, 195]);
+  const buyArgs = encodePumpAmmBuyArgs({
+    spendableQuoteIn: 100_000_000,
+    minBaseAmountOut: 1,
+    maxSolCost: 100_000_000,
+    sponsorLamports: 0,
+  });
+  assert.equal(buyArgs.length, 32);
+  const sellArgs = encodePumpAmmSellArgs({
+    baseAmountIn: 1_000,
+    minQuoteAmountOut: 1,
+    sponsorLamports: 0,
+  });
+  assert.equal(sellArgs.length, 24);
+
+  const [grokAccount] = grokAccountPda(PROGRAM, ROOT);
+  const [spendVault] = spendVaultPda(INTENTS, grokAccount);
+  const [pumpTrader] = pumpTraderPda(INTENTS, grokAccount);
+  const amm = new PublicKey(PUMP_AMM_PROGRAM_ID);
+
+  const buyRemaining = Array.from({ length: 26 }, (_, i) => ({
+    pubkey: i === 1 ? pumpTrader : i === 16 ? amm : new PublicKey("11111111111111111111111111111111"),
+    isSigner: false,
+    isWritable: i === 1,
+  }));
+  const built = buildPumpAmmBuyIx({
+    coreProgramId: PROGRAM,
+    intentsProgramId: INTENTS,
+    root: ROOT,
+    agent: AGENT,
+    spendableQuoteIn: 100_000_000,
+    minBaseAmountOut: 1,
+    maxSolCost: 100_000_000,
+    sponsorLamports: 0,
+    remainingAccounts: buyRemaining,
+  });
+  assert.equal(built.ix.data.length, 40);
+  assert.deepEqual(Array.from(built.ix.data.subarray(0, 8)), Array.from(INTENTS_DISC.pump_amm_buy));
+  assert.equal(built.ix.keys[0]!.pubkey.equals(AGENT), true);
+  assert.equal(built.ix.keys[0]!.isSigner, true);
+  assert.equal(built.ix.keys[7]!.pubkey.equals(amm), true);
+  assert.equal(built.ix.keys.length, 10 + 26);
+
+  const vaultAsUser = buyRemaining.map((a, i) => (i === 1 ? { ...a, pubkey: spendVault } : a));
+  assert.throws(
+    () =>
+      buildPumpAmmBuyIx({
+        coreProgramId: PROGRAM,
+        intentsProgramId: INTENTS,
+        root: ROOT,
+        agent: AGENT,
+        spendableQuoteIn: 1,
+        minBaseAmountOut: 0,
+        maxSolCost: 1,
+        sponsorLamports: 0,
+        remainingAccounts: vaultAsUser,
+      }),
+    /SpendVault|trader/,
+  );
+
+  const sellRemaining = Array.from({ length: 24 }, (_, i) => ({
+    pubkey: i === 1 ? pumpTrader : i === 16 ? amm : new PublicKey("11111111111111111111111111111111"),
+    isSigner: false,
+    isWritable: i === 1,
+  }));
+  const sold = buildPumpAmmSellIx({
+    coreProgramId: PROGRAM,
+    intentsProgramId: INTENTS,
+    root: ROOT,
+    agent: AGENT,
+    baseAmountIn: 1_000,
+    minQuoteAmountOut: 1,
+    sponsorLamports: 0,
+    remainingAccounts: sellRemaining,
+  });
+  assert.deepEqual(Array.from(sold.ix.data.subarray(0, 8)), Array.from(INTENTS_DISC.pump_amm_sell));
+  assert.equal(sold.ix.data.length, 32);
+
+  assert.throws(
+    () =>
+      buildPumpAmmSellIx({
+        coreProgramId: PROGRAM,
+        intentsProgramId: INTENTS,
+        root: ROOT,
+        agent: AGENT,
+        baseAmountIn: 1_000,
+        minQuoteAmountOut: 1,
+        sponsorLamports: 0,
+        remainingAccounts: buyRemaining,
+      }),
+    /24|volume|buy/,
+  );
 });

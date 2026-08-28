@@ -65,6 +65,8 @@ export const INTENTS_DISC = {
   init_pump_trader: Buffer.from([92, 98, 75, 2, 93, 219, 250, 5]),
   fund_pump_trader: Buffer.from([63, 189, 216, 54, 81, 101, 241, 97]),
   pump_create: Buffer.from([24, 176, 142, 141, 243, 152, 56, 128]),
+  pump_amm_buy: Buffer.from([129, 59, 179, 195, 110, 135, 61, 2]),
+  pump_amm_sell: Buffer.from([238, 234, 142, 38, 107, 206, 76, 195]),
 } as const;
 
 /** Official pump.fun program. Only inner program pump_buy/pump_sell/pump_create CPI into. */
@@ -90,6 +92,22 @@ export const PUMP_CREATE_USER_INDEX = 5;
 export const PUMP_CREATE_NAME_MAX = 32;
 export const PUMP_CREATE_SYMBOL_MAX = 13;
 export const PUMP_CREATE_URI_MAX = 200;
+
+/** Official PumpSwap AMM (post-graduation). Only inner program pump_amm_* CPI into. */
+export const PUMP_AMM_PROGRAM_ID = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA";
+
+/** Official PumpSwap buy_exact_quote_in / sell discs (constructed on-chain). */
+export const PUMP_AMM_DISC = {
+  buy_exact_quote_in: Buffer.from([198, 46, 21, 82, 180, 217, 232, 112]),
+  sell: Buffer.from([51, 230, 133, 164, 1, 127, 131, 173]),
+} as const;
+
+/** Official PumpSwap buy remaining: 26 non-cashback, 27 cashback. Sell remaining: 24 (no volume accs). */
+export const PUMP_AMM_BUY_ACCOUNT_COUNT = 26;
+export const PUMP_AMM_BUY_ACCOUNT_COUNT_CASHBACK = 27;
+export const PUMP_AMM_SELL_ACCOUNT_COUNT = 24;
+export const PUMP_AMM_USER_INDEX = 1;
+export const PUMP_AMM_PROGRAM_INDEX = 16;
 
 /** Anchor account discriminators. */
 export const ACCOUNT_DISC = {

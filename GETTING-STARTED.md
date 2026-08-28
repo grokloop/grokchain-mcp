@@ -1,6 +1,6 @@
 # Getting started on Grok Chain (MAINNET)
 
-Pay, pump, call, and deploy are live on Solana MAINNET INTENTS `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw`. deploy is a grant event, not an ELF upload. swap is a grant-gated SOL min_out send, not an AMM. pump is official pump.fun. The human wallet is the only secret you keep. The bot never gets a seed.
+Pay, pump, pump_amm_buy, pump_amm_sell, call, and deploy are live on Solana MAINNET INTENTS `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw`. deploy is a grant event, not an ELF upload. swap is a grant-gated SOL min_out send, not an AMM. pump is official pump.fun curve. pump_amm_* is grant-gated PumpSwap. The human wallet is the only secret you keep. The bot never gets a seed.
 
 There is no setup --mainnet yet. Do not use setup --devnet as the MAINNET path. Set env, then run the MCP:
 
@@ -47,7 +47,7 @@ Env names **PATHS**, never seeds or key bytes.
 - Agent and relayer are host files mode `0600`. Reused if they already exist. Never overwrite.
 - Never paste a seed into a bot. Never ask a bot for a key.
 - Relayer pays fees. Human funds vaults. Bot never holds SOL.
-- CORE / INTENTS ids on **MAINNET** (pay + pump + call + deploy):
+- CORE / INTENTS ids on **MAINNET** (pay + pump + pump_amm + call + deploy):
   - CORE `44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd`
     https://explorer.solana.com/address/44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd
   - INTENTS `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw`
@@ -60,6 +60,7 @@ Env names **PATHS**, never seeds or key bytes.
 - `swap` is a grant-gated SOL min_out send. Not an AMM. Not Jupiter.
 - `pump_buy` / `pump_sell` / `pump_create` are official pump.fun CPIs. Trader PDA is user. SpendVault is never user.
 - Migrated (complete) bonding curves cannot `buy_v2`. 27-account `pump_buy` needs a v0 transaction + address lookup table on public RPC.
+- `pump_amm_buy` / `pump_amm_sell` are grant-gated PumpSwap. Trader is remaining[1] only. Vault is never user. Buy remaining 26. Sell remaining 24 (no volume accs). Do not pass buy's 26 to sell. Agent stays 0 SOL. Quote unwrap stays on the trader, not the vault.
 
 
 Long form (every step by hand): [HUMAN.md](./HUMAN.md).
@@ -85,6 +86,33 @@ export GROKCHAIN_ROOT_KEYPAIR=$HOME/.config/solana/id.json
 export GROKCHAIN_AGENT_KEYPAIR=$HOME/.config/grokchain/agent.json
 export GROKCHAIN_RELAYER_KEYPAIR=$HOME/.config/grokchain/relayer.json
 ```
+
+Do not Jupiter-swap and call it Grok Chain.
+
+## MAINNET pump_amm (PumpSwap, graduated mint)
+
+Same env as pay. Extra for a PumpSwap trade:
+
+1. Root calls `init_pump_trader` once. Trader PDA seeds `[pump-trader, grok_account]`. System-owned. 0-byte.
+2. Buy: grant cap must cover `max_sol_cost`. `fund_pump_trader` so the trader holds spendable quote plus rent. Adapter wraps onto trader WSOL ATA. No in-ix vault debit.
+3. Sell: grant amount is 0. Seller already holds base tokens on trader ATA. Do not wrap SOL.
+4. `remaining_accounts`: buy 26 (or 27 cashback). sell 24 (no volume accs). `user` is remaining[1] = trader PDA. Vault is never user.
+5. Do not pass buy's 26-account list to sell. That shifts fee_config and fails on-chain.
+6. Quote unwrap stays on the trader, not the vault. Agent stays 0 SOL.
+
+```bash
+export GROKCHAIN_CLUSTER=mainnet-beta
+export GROKCHAIN_RPC_URL=https://api.mainnet-beta.solana.com
+export GROKCHAIN_PROGRAM_ID=44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd
+export GROKCHAIN_INTENTS_PROGRAM_ID=3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw
+export GROKCHAIN_ROOT_KEYPAIR=$HOME/.config/solana/id.json
+export GROKCHAIN_AGENT_KEYPAIR=$HOME/.config/grokchain/agent.json
+export GROKCHAIN_RELAYER_KEYPAIR=$HOME/.config/grokchain/relayer.json
+```
+
+Proven MAINNET buy: `59PuJuszMqYMGmXwuuCD4aufwKK8ttZGjujvwGpq7q8t4bvDtfFeCTjfigxcqB4NwNpmANV49MhJfGruUXx4RxcC` (slot 442367250, 0.1 SOL → 149274.512729 $GrokChain, agent 0 SOL). Explorer has no `?cluster=devnet`.
+
+Proven MAINNET sell: `42mkDG4zb57MNBoMD2wKdGuRwz3oBdrgjmoWsb8Me4VRueF1PhJLu8iaoucuHc9CPLQ3e9AtLcj135SEY9KTDmRf` (PumpAmmSell + PumpSwap Sell + CheckGrant, Finalized). Trader `5QkJFdLm` native SOL 0.00089088 → 0.019022138. Unwrap stayed on trader, not vault. WSOL ATA closed. Agent still 0 SOL.
 
 Do not Jupiter-swap and call it Grok Chain.
 

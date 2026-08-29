@@ -28,6 +28,12 @@ export const SEED_GROK_ACCOUNT = Buffer.from("grok-account");
 export const SEED_GRANT = Buffer.from("grant");
 export const SEED_SPEND_VAULT = Buffer.from("spend-vault");
 export const SEED_PAYMASTER = Buffer.from("paymaster");
+/** Root-owned payee allowlist. CORE grants cannot constrain a recipient. */
+export const SEED_MERCHANTS = Buffer.from("merchants");
+export const MAX_MERCHANTS = 32;
+/** One subscription per (merchant, mint) under a GrokAccount. */
+export const SEED_SUBSCRIPTION = Buffer.from("subscription");
+
 export const SEED_PUMP_TRADER = Buffer.from("pump-trader");
 
 export const MAX_ALLOWED_PROGRAMS = 8;
@@ -68,6 +74,14 @@ export const INTENTS_DISC = {
   pump_amm_buy: Buffer.from([129, 59, 179, 195, 110, 135, 61, 2]),
   pump_amm_sell: Buffer.from([238, 234, 142, 38, 107, 206, 76, 195]),
   withdraw_pump_trader: Buffer.from([188, 237, 135, 114, 143, 224, 45, 178]),
+  // pay_token + merchant allowlist. Require an INTENTS upgrade.
+  pay_token: Buffer.from([165, 233, 248, 250, 110, 155, 215, 142]),
+  init_merchant_registry: Buffer.from([50, 15, 122, 207, 163, 181, 242, 7]),
+  add_merchant: Buffer.from([198, 82, 166, 156, 165, 93, 203, 72]),
+  remove_merchant: Buffer.from([55, 213, 255, 172, 106, 179, 207, 38]),
+  create_subscription: Buffer.from([65, 71, 10, 60, 249, 82, 197, 12]),
+  cancel_subscription: Buffer.from([60, 139, 189, 242, 191, 208, 143, 18]),
+  pay_subscription: Buffer.from([214, 139, 186, 253, 169, 248, 196, 11]),
   token_buy: Buffer.from([116, 167, 118, 40, 127, 96, 55, 234]),
   token_sell: Buffer.from([154, 76, 173, 221, 122, 208, 158, 103]),
 } as const;
@@ -97,9 +111,18 @@ export const ASSOCIATED_TOKEN_PROGRAM_ID = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTN
 
 /**
  * BondingCurve layout, decoded from a live mainnet account:
- * disc(8) + 5 x u64 + complete(1) + creator(32). complete === 1 means the coin
- * graduated and must be traded on the AMM instead.
+ * disc(8) + virtual_token(8) + virtual_sol(8) + real_token(8) + real_sol(8)
+ * + total_supply(8) + complete(1) + creator(32).
+ *
+ * complete === 1 means the coin graduated and must trade on the AMM. The reserve
+ * offsets are what marks a position; routing only needs the flag.
  */
+export const BC_VIRTUAL_TOKEN_OFFSET = 8;
+export const BC_VIRTUAL_SOL_OFFSET = 16;
+export const BC_REAL_TOKEN_OFFSET = 24;
+export const BC_REAL_SOL_OFFSET = 32;
+export const BC_TOTAL_SUPPLY_OFFSET = 40;
+
 export const BONDING_CURVE_DISCRIMINATOR = Buffer.from([23, 183, 248, 55, 96, 216, 172, 96]);
 export const BONDING_CURVE_COMPLETE_OFFSET = 48;
 export const BONDING_CURVE_CREATOR_OFFSET = 49;

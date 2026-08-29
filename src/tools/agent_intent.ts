@@ -59,7 +59,9 @@ export type BuiltIntent = {
  */
 export async function submitAgentIntent(opts: {
   raw: Record<string, unknown> & { root?: string; dry_run?: boolean };
-  intent: "swap" | "deploy" | "call" | "pump_buy" | "pump_sell" | "pump_create" | "pump_amm_buy" | "pump_amm_sell" | "token_buy" | "token_sell";
+  intent: "swap" | "deploy" | "call" | "pump_buy" | "pump_sell" | "pump_create" | "pump_amm_buy" | "pump_amm_sell" | "token_buy" | "token_sell"
+    | "pay_token"
+    | "pay_subscription";
   movedSolOnOk: boolean;
   extraFields: Record<string, unknown>;
   notes: string[];

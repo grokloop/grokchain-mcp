@@ -60,7 +60,7 @@ export async function tokenSellTool(
 
     const supplied = parseOptionalRemaining(args.remaining_accounts);
     let remaining = supplied;
-    let jupiterData = args.jupiter_data ? Buffer.from(args.jupiter_data, "base64") : Buffer.alloc(0);
+    let jupiterData: Buffer = args.jupiter_data ? Buffer.from(args.jupiter_data, "base64") : Buffer.alloc(0);
     let quoteNotes: string[] = [];
     let quoteOut = "";
     let quoteEndpoint = "";
@@ -75,7 +75,11 @@ export async function tokenSellTool(
         slippageBps: Number.isFinite(slippageBps) ? slippageBps : 50,
       });
       quoteEndpoint = endpoint;
-      quoteOut = String(quote.outAmount ?? "");
+      // otherAmountThreshold is the slippage-adjusted FLOOR; outAmount is only the
+      // expected fill. min_out is enforced on chain against real balances, so
+      // defaulting to outAmount would mean zero tolerance and a failed swap on
+      // any price movement between quote and execution.
+      quoteOut = String(quote.otherAmountThreshold ?? quote.outAmount ?? "");
       const { ixs, endpoint: swapEp } = await fetchJupiterSwapInstructions({
         quote,
         userPublicKey: trader.toBase58(),

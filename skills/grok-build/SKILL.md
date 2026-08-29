@@ -128,3 +128,17 @@ A pump.fun coin leaves its bonding curve when the curve completes. After that
 - `pump_amm_derive` — read-only; shows the pool and the exact list.
 
 Report the `venue` and `pool` from the result so the human knows which mouth ran.
+
+## Knowing what you hold
+
+`get_positions` is the read an exit ladder runs on. It returns the pump-trader's
+native SOL plus every token position, queried across **both** the classic Token
+and Token-2022 programs — a $GrokChain bag is Token-2022, and a reader that
+checks only the classic program reports an empty book while you are holding.
+
+With `marks:true` (the default) each position is priced from live reserves: the
+bonding curve's virtual reserves before graduation, the pool's own balances
+after. Those marks are **pre-fee** and round against you on purpose, so use them
+to decide *whether* to exit and let the venue's `min_quote_amount_out` /
+`max_sol_cost` bound the actual fill. A position the tool could not mark is
+reported unpriced — never treat it as zero.

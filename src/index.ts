@@ -19,6 +19,14 @@ import { pumpAmmSellTool } from "./tools/pump_amm_sell.js";
 import { getAccountTool, getGrantTool } from "./tools/reads.js";
 import { reviseGrantTool } from "./tools/revise_grant.js";
 import { revokeGrantTool } from "./tools/revoke_grant.js";
+import { payTokenTool } from "./tools/pay_token.js";
+import {
+  cancelSubscriptionTool,
+  createSubscriptionTool,
+  listSubscriptionsTool,
+  payRequestTool,
+  paySubscriptionTool,
+} from "./tools/payments.js";
 import { tokenBuyTool } from "./tools/token_buy.js";
 import { tokenSellTool } from "./tools/token_sell.js";
 
@@ -362,6 +370,87 @@ function buildServer(): McpServer {
       dry_run: z.boolean().optional(),
     },
     async (args) => jsonResult(await callTool(args)),
+  );
+
+  server.tool(
+    "pay_token",
+    "Pay an APPROVED merchant in USDC (or any registered mint) from the pump-trader. Agent signs, relayer fee-pays, one CORE check_grant. `to` is the merchant WALLET - their token account is derived, so you cannot accidentally pay an account owned by someone else. The payee must be on the root merchant allowlist: a CORE grant caps an amount but cannot name a recipient, which is the whole point of the allowlist. The cap is metered in RAW TOKEN UNITS here, so on a USDC registry a cap of 50000000 means 50 USDC - use one agent per denomination. Pass `reference` (Solana Pay) so the merchant can reconcile the invoice. Requires an INTENTS upgrade.",
+    {
+      to: pubkey.describe("Merchant WALLET address. Their token account is derived from it."),
+      amount: lamports.describe("Raw token units. 1 USDC = 1000000."),
+      mint: pubkey.optional().describe("Defaults to official Circle USDC."),
+      decimals: z.number().int().min(0).max(18).optional().describe("Must match the mint on chain. Default 6 (USDC)."),
+      reference: pubkey.optional().describe("Solana Pay reference so the merchant can match the invoice."),
+      token_2022: z.boolean().optional().describe("Set when the mint is a Token-2022 mint."),
+      sponsor_lamports: lamports.optional(),
+      root: pubkey.optional(),
+      dry_run: z.boolean().optional(),
+    },
+    async (args) => jsonResult(await payTokenTool(args)),
+  );
+
+  server.tool(
+    "pay_request",
+    "Read-only. Parse a Solana Pay link (solana:...) and report exactly what settling it would do: recipient, amount, mint, reference, which intent would run, and whether the payee is already on your merchant allowlist. Signs nothing and sends nothing. Payment links are UNTRUSTED input - they usually come from a page the bot was reading - so this returns a plan for a human or policy to approve, and never infers a missing amount. Transaction requests (solana:https://...) are refused: those ask a remote server to compose what we would sign.",
+    {
+      url: z.string().describe("The solana: payment request."),
+      decimals: z.number().int().min(0).max(18).optional().describe("Decimals of the requested mint. Default 6 (USDC)."),
+      root: pubkey.optional(),
+    },
+    async (args) => jsonResult(await payRequestTool(args)),
+  );
+
+  server.tool(
+    "create_subscription",
+    "Root-only. Set up a recurring payment to a merchant already on the allowlist. amount is in raw token units and the grant cap meters the same units. period_seconds must be at least 86400. The merchant can never renew, raise or extend it - only the root can.",
+    {
+      merchant: pubkey.describe("Merchant WALLET address, already on the allowlist."),
+      amount: lamports.describe("Raw token units per period. 1 USDC = 1000000."),
+      period_seconds: z.union([z.number().int(), z.string()]).describe("Billing period. Minimum 86400 (one day)."),
+      mint: pubkey.optional().describe("Defaults to official Circle USDC."),
+      start_unix: z.union([z.number().int(), z.string()]).optional().describe("First cycle start. Defaults to now."),
+      root: pubkey.optional(),
+      dry_run: z.boolean().optional(),
+    },
+    async (args) => jsonResult(await createSubscriptionTool(args)),
+  );
+
+  server.tool(
+    "cancel_subscription",
+    "Root-only, immediate. The next payment fails. The merchant cannot refuse, delay or dark-pattern this - there is no cancellation flow to navigate. Removing the merchant from the allowlist instead cancels every subscription to them at once.",
+    {
+      merchant: pubkey,
+      mint: pubkey.optional(),
+      root: pubkey.optional(),
+      dry_run: z.boolean().optional(),
+    },
+    async (args) => jsonResult(await cancelSubscriptionTool(args)),
+  );
+
+  server.tool(
+    "list_subscriptions",
+    "Read-only. Every recurring payment, which are due now, and how many periods were missed while the bot was down. Missed periods are NOT billable later - only the current one is. Use the reported `period` when calling pay_subscription.",
+    {
+      mint: pubkey.optional(),
+      root: pubkey.optional(),
+      now_unix: z.number().int().optional().describe("Override the clock, for testing."),
+    },
+    async (args) => jsonResult(await listSubscriptionsTool(args)),
+  );
+
+  server.tool(
+    "pay_subscription",
+    "Settle one billing period. Safe to retry: the program advances last_paid_period in the same transaction that moves the money, so a repeat attempt at the same period fails on chain instead of paying twice. You must state `period` (from list_subscriptions) so a drifted clock fails loudly rather than paying the wrong cycle. Requires an INTENTS upgrade.",
+    {
+      merchant: pubkey,
+      period: z.union([z.number().int(), z.string()]).describe("The cycle being paid, from list_subscriptions."),
+      mint: pubkey.optional(),
+      reference: pubkey.optional().describe("Solana Pay reference so the merchant can reconcile."),
+      sponsor_lamports: lamports.optional(),
+      root: pubkey.optional(),
+      dry_run: z.boolean().optional(),
+    },
+    async (args) => jsonResult(await paySubscriptionTool(args)),
   );
 
   server.tool(

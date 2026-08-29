@@ -61,7 +61,7 @@ export async function tokenBuyTool(
 
     const supplied = parseOptionalRemaining(args.remaining_accounts);
     let remaining = supplied;
-    let jupiterData = args.jupiter_data ? Buffer.from(args.jupiter_data, "base64") : Buffer.alloc(0);
+    let jupiterData: Buffer = args.jupiter_data ? Buffer.from(args.jupiter_data, "base64") : Buffer.alloc(0);
     let quoteNotes: string[] = [];
     let quoteOut = "";
     let quoteEndpoint = "";

@@ -295,3 +295,62 @@ Honest facts before funding:
   buy's 26 to sell. Not Jupiter.
 - Size the **grant cap** to what you can lose. Quote unwrap stays on the trader,
   not the vault. Agent stays 0 SOL.
+
+## Payments: one-off, checkout, and subscriptions
+
+The desk can pay real merchants in USDC (or any registered mint), not just trade.
+Three controls bound every payment, and only you can widen any of them:
+
+- **the grant cap** — total spend before you must re-authorise. For token
+  payments it is metered in **raw token units**, so a cap of `50000000` on a USDC
+  registry means 50 USDC. Use one agent per denomination or the cap stops meaning
+  anything.
+- **the grant expiry** — the budget dies on its own.
+- **the merchant allowlist** — a root-owned list of who may be paid at all. This
+  is the control a CORE grant cannot express: it caps an amount and names a
+  program, never a recipient. Without it a stolen agent key could pay anyone up
+  to the cap; with it, only merchants you approved.
+
+Set up once: `init_merchant_registry` (pins one mint), then `add_merchant` for
+each payee. `remove_merchant` is immediate and cancels every subscription to that
+merchant at once.
+
+### Solana Pay
+
+`pay_request` parses a `solana:` link and reports what settling it would do —
+recipient, amount, mint, reference, and whether the payee is approved — without
+signing anything. Treat the output as a plan to approve, not a decision already
+made. Links usually come from a web page, and `label` and `message` are text the
+requester chose.
+
+`solana:https://...` transaction requests are refused: they ask a remote server
+to compose the transaction your agent would sign, which is the exact thing a
+capability grant exists to prevent.
+
+### Subscriptions
+
+`create_subscription` bills a fixed amount every N seconds (minimum one day) to a
+merchant already on the allowlist. The agent settles each period with
+`pay_subscription`; the human cancels with `cancel_subscription`, immediately and
+without the merchant's cooperation.
+
+Two behaviours worth knowing:
+
+- **Retries cannot double-pay.** The period counter advances in the same
+  transaction that moves the money, so a repeat attempt fails on chain. A
+  scheduler that crashes mid-send can simply try again.
+- **Missed periods are not backfilled.** A bot offline for three cycles pays the
+  current one only, and `list_subscriptions` reports the gap. Waking to a
+  surprise triple charge is the worse failure.
+
+### Three scopes of cancel
+
+| To stop | Do | Effect |
+| --- | --- | --- |
+| One subscription | `cancel_subscription` | That merchant, that mint |
+| Every payment to a merchant | `remove_merchant` | All their subscriptions at once |
+| All spending, keep selling | `revise_grant` cap = spent | Buys fail, sells still work |
+| Everything | `revoke_grant` | Nothing works, including exits |
+
+None of these require the merchant to agree, and none of them can be delayed by a
+cancellation flow.

@@ -8,6 +8,7 @@ import {
   loadKeyFromEnvPath,
 } from "./keys.js";
 import { isSetupDevnet, normalizeCliCmd, runSetupDevnet } from "./setup.js";
+import { runSetupMainnet } from "./setup_mainnet.js";
 import { checkGrantTool } from "./tools/check_grant.js";
 import { createAccountTool } from "./tools/create_account.js";
 import { issueGrantTool } from "./tools/issue_grant.js";
@@ -27,6 +28,12 @@ import {
   withdrawPumpTraderTool,
   withdrawSpendVaultTool,
 } from "./tools/vaults.js";
+import {
+  merchantAddTool,
+  merchantInitTool,
+  merchantListTool,
+  merchantRemoveTool,
+} from "./tools/merchants.js";
 import { tokenBuyTool } from "./tools/token_buy.js";
 import { tokenSellTool } from "./tools/token_sell.js";
 
@@ -86,6 +93,20 @@ Commands:
       Creates agent+relayer 0600 keystores (reuses if present), airdrops if it can,
       create_account, issue_grant (allowlist EYhYtq…), SpendVault + Paymaster.
       Prints an MCP snippet. Does not send a pay. Idempotent. See GETTING-STARTED.md.
+  grokchain setup --mainnet [--plan-only] [--yes] [--usdc-cap <raw>] [--paymaster-sol <n>]
+      REAL MONEY, and it behaves like it: prints a costed plan of every account and
+      its rent, then stops unless you agree. --plan-only never sends. A non-terminal
+      without --yes is a refusal, not consent. There is no faucet: if the root is
+      short it says by how much and stops.
+      --usdc-cap is in RAW USDC UNITS (50000000 = 50 USDC), not lamports.
+      Does NOT fund the trader with USDC and does NOT add a merchant — those two
+      decide what the bot can spend and who it can pay, so they stay deliberate.
+  grokchain merchant init [--mint <pk>]      create the payee allowlist (root)
+  grokchain merchant add --merchant <pk>     approve a payee (root)
+  grokchain merchant remove --merchant <pk>  revoke a payee, immediately (root)
+  grokchain merchant list                    show who the bot may pay
+      A CORE grant caps an amount and names a program, never a recipient. The
+      allowlist is what stops a stolen agent key paying anyone it likes.
 
 removed: grokchain fund --to agent (old wrong path).
 The bot/agent never holds SOL and is never the fee payer.
@@ -212,6 +233,27 @@ async function main(): Promise<void> {
     printJson(await revokeGrantTool({ agent: req(flags, "agent"), dry_run: dry(flags) }));
     return;
   }
+  if (head === "merchant init") {
+    printJson(
+      await merchantInitTool({
+        mint: typeof flags.mint === "string" ? flags.mint : undefined,
+        dry_run: dry(flags),
+      }),
+    );
+    return;
+  }
+  if (head === "merchant add") {
+    printJson(await merchantAddTool({ merchant: req(flags, "merchant"), dry_run: dry(flags) }));
+    return;
+  }
+  if (head === "merchant remove") {
+    printJson(await merchantRemoveTool({ merchant: req(flags, "merchant"), dry_run: dry(flags) }));
+    return;
+  }
+  if (head === "merchant list") {
+    printJson(await merchantListTool({}));
+    return;
+  }
   if (head === "vault init-spend") {
     printJson(await initSpendVaultTool({ dry_run: dry(flags) }));
     return;
@@ -309,8 +351,26 @@ async function main(): Promise<void> {
     return;
   }
   if (cmd[0] === "setup") {
+    if (flags.mainnet === true || cmd[1] === "mainnet") {
+      // Real money: plan first, and treat a non-terminal without --yes as a
+      // refusal rather than consent.
+      const result = await runSetupMainnet({
+        yes: flags.yes === true,
+        planOnly: flags["plan-only"] === true || flags["dry-run"] === true,
+        usdcCap:
+          typeof flags["usdc-cap"] === "string" ? Number(flags["usdc-cap"]) : undefined,
+        paymasterSol:
+          typeof flags["paymaster-sol"] === "string"
+            ? Number(flags["paymaster-sol"])
+            : undefined,
+      });
+      if (result.status !== "ok" && result.status !== "planned") {
+        process.exit(1);
+      }
+      return;
+    }
     if (!isSetupDevnet(cmd, flags)) {
-      process.stderr.write("setup currently supports --devnet (or: grokchain setup devnet). See GETTING-STARTED.md.\n");
+      process.stderr.write("setup supports --devnet or --mainnet (or: grokchain setup devnet|mainnet). See GETTING-STARTED.md.\n");
       process.exit(1);
     }
     const result = await runSetupDevnet({ yes: flags.yes === true });

@@ -24,7 +24,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "tsx --test tests/config.test.ts tests/ix.test.ts tests/payments.test.ts tests/paytoken.test.ts tests/policy.test.ts tests/pricing.test.ts tests/pump_amm_accounts.test.ts tests/schema.test.ts tests/seeds.test.ts tests/setup.test.ts",
+    "test": "tsx --test tests/config.test.ts tests/ix.test.ts tests/payments.test.ts tests/paytoken.test.ts tests/policy.test.ts tests/pricing.test.ts tests/pump_amm_accounts.test.ts tests/purchase_flow.test.ts tests/schema.test.ts tests/seeds.test.ts tests/setup.test.ts",
     "grokchain": "node dist/cli.js",
     "prepare": "tsc"
   },

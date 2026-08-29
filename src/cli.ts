@@ -24,6 +24,7 @@ import {
   unpausePaymasterTool,
   vaultStatus,
   withdrawPaymasterTool,
+  withdrawPumpTraderTool,
   withdrawSpendVaultTool,
 } from "./tools/vaults.js";
 
@@ -59,6 +60,8 @@ Commands:
   grokchain vault init-spend
   grokchain vault fund-spend --sol <n>
   grokchain vault withdraw-spend --sol <n>
+  grokchain vault withdraw-pump-trader [--lamports <n>] [--sol <n>] [--atas from,to,...]
+      Root-only. Not grant-gated. 0 / omitted lamports = SOL no-op (token sweep ok).
   grokchain paymaster init --relayer <pk>
   grokchain paymaster fund --sol <n>
   grokchain paymaster withdraw --sol <n>
@@ -214,6 +217,17 @@ async function main(): Promise<void> {
   }
   if (head === "vault withdraw-spend") {
     printJson(await withdrawSpendVaultTool({ sol: req(flags, "sol"), dry_run: dry(flags) }));
+    return;
+  }
+  if (head === "vault withdraw-pump-trader") {
+    printJson(
+      await withdrawPumpTraderTool({
+        lamports: typeof flags.lamports === "string" ? flags.lamports : undefined,
+        sol: typeof flags.sol === "string" ? flags.sol : undefined,
+        atas: typeof flags.atas === "string" ? flags.atas : undefined,
+        dry_run: dry(flags),
+      }),
+    );
     return;
   }
   if (head === "paymaster init") {

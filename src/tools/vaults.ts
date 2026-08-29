@@ -1,4 +1,4 @@
-import { LAMPORTS_PER_SOL, type TransactionInstruction } from "@solana/web3.js";
+import { LAMPORTS_PER_SOL, PublicKey, type TransactionInstruction } from "@solana/web3.js";
 import {
   fetchPaymaster,
   fetchSpendVault,
@@ -15,6 +15,7 @@ import {
   buildSetRelayerIx,
   buildUnpausePaymasterIx,
   buildWithdrawPaymasterIx,
+  buildWithdrawPumpTraderIx,
   buildWithdrawSpendVaultIx,
   deriveIntentsAddrs,
   type VaultAddrs,
@@ -291,6 +292,71 @@ export async function vaultStatus(args: { root?: string; agent?: string } = {}):
       },
       intent: "status",
     };
+  } catch (e) {
+    return asError(e);
+  }
+}
+
+
+export async function withdrawPumpTraderTool(args: {
+  lamports?: number | string;
+  sol?: number | string;
+  atas?: string | string[];
+  dry_run?: boolean;
+  root?: string;
+} = {}): Promise<ToolResult> {
+  try {
+    const ctx = openCtx(args);
+    const rootPk = resolveRootPubkey(ctx, args.root);
+    if (!rootPk) return missingRoot(ctx, { intent: "withdraw_pump_trader" });
+    let lamports: bigint;
+    if (args.lamports !== undefined && args.lamports !== "") {
+      const n = toBigInt(args.lamports, "--lamports");
+      if (n < 0n) throw new PolicyError("ZeroAmount", "--lamports must be >= 0");
+      lamports = n;
+    } else if (args.sol !== undefined && args.sol !== "") {
+      lamports = solToLamports(args.sol, "--sol");
+    } else {
+      lamports = 0n;
+    }
+    const rawAtas = args.atas;
+    const list: string[] = Array.isArray(rawAtas)
+      ? rawAtas
+      : typeof rawAtas === "string" && rawAtas.trim()
+        ? rawAtas.split(",").map((s) => s.trim()).filter(Boolean)
+        : [];
+    if (list.length % 2 !== 0) {
+      throw new PolicyError("WithdrawRemainingAccountsOdd", "--atas must be even from,to pairs");
+    }
+    const tokenPairs: Array<{ from: PublicKey; to: PublicKey }> = [];
+    for (let i = 0; i < list.length; i += 2) {
+      tokenPairs.push({
+        from: parsePubkey(list[i]!, "--atas from"),
+        to: parsePubkey(list[i + 1]!, "--atas to"),
+      });
+    }
+    const built = buildWithdrawPumpTraderIx({
+      ...coreOpts(ctx, rootPk),
+      lamports,
+      tokenPairs,
+    });
+    return await dispatchIx({
+      cfg: ctx.cfg,
+      ix: built.ix,
+      feePayer: rootPk,
+      signer: ctx.root.keypair,
+      signerRole: "root",
+      dryRun: args.dry_run,
+      extra: {
+        grok_account: built.grokAccount.toBase58(),
+        pump_trader: built.pumpTrader.toBase58(),
+        root: rootPk.toBase58(),
+        intent: "withdraw_pump_trader",
+        lamports: lamports.toString(),
+        token_pairs: tokenPairs.map((p) => ({ from: p.from.toBase58(), to: p.to.toBase58() })),
+        note: "root-only. not grant-gated. agent cannot call. 0 lamports = SOL no-op.",
+      },
+    });
   } catch (e) {
     return asError(e);
   }

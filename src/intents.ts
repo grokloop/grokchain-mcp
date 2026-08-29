@@ -4,7 +4,7 @@ import {
   TransactionInstruction,
   type AccountMeta,
 } from "@solana/web3.js";
-import { INTENTS_DISC, PUMP_AMM_BUY_ACCOUNT_COUNT, PUMP_AMM_BUY_ACCOUNT_COUNT_CASHBACK, PUMP_AMM_PROGRAM_ID, PUMP_AMM_PROGRAM_INDEX, PUMP_AMM_SELL_ACCOUNT_COUNT, PUMP_AMM_USER_INDEX, PUMP_BUY_V2_ACCOUNT_COUNT, PUMP_CREATE_MINT_INDEX, PUMP_CREATE_USER_INDEX, PUMP_CREATE_V2_ACCOUNT_COUNT, PUMP_CREATE_V2_ACCOUNT_COUNT_WITH_QUOTE, PUMP_PROGRAM_ID, PUMP_SELL_V2_ACCOUNT_COUNT, PUMP_USER_INDEX } from "./constants.js";
+import { INTENTS_DISC, PUMP_AMM_BUY_ACCOUNT_COUNT, PUMP_AMM_BUY_ACCOUNT_COUNT_CASHBACK, PUMP_AMM_PROGRAM_ID, PUMP_AMM_PROGRAM_INDEX, PUMP_AMM_SELL_ACCOUNT_COUNT, PUMP_AMM_USER_INDEX, PUMP_BUY_V2_ACCOUNT_COUNT, PUMP_CREATE_MINT_INDEX, PUMP_CREATE_USER_INDEX, PUMP_CREATE_V2_ACCOUNT_COUNT, PUMP_CREATE_V2_ACCOUNT_COUNT_WITH_QUOTE, PUMP_PROGRAM_ID, PUMP_SELL_V2_ACCOUNT_COUNT, PUMP_USER_INDEX, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "./constants.js";
 import { encodeCallArgs, encodeDeployArgs, encodePayArgs, encodePubkey, encodePumpAmmBuyArgs, encodePumpAmmSellArgs, encodePumpBuyArgs, encodePumpCreateArgs, encodePumpSellArgs, encodeSwapArgs, encodeU64 } from "./encode.js";
 import { grantPda, grokAccountPda, paymasterPda, pumpTraderPda, spendVaultPda } from "./pda.js";
 
@@ -645,6 +645,40 @@ export function buildFundPumpTraderIx(opts: {
     }),
   };
 }
+
+
+export function buildWithdrawPumpTraderIx(opts: {
+  coreProgramId: PublicKey;
+  intentsProgramId: PublicKey;
+  root: PublicKey;
+  lamports: bigint | number | string;
+  tokenPairs?: Array<{ from: PublicKey; to: PublicKey }>;
+}): { ix: TransactionInstruction } & VaultAddrs {
+  const addrs = deriveIntentsAddrs(opts);
+  const pairs = opts.tokenPairs ?? [];
+  const remaining: AccountMeta[] = [];
+  for (const pair of pairs) {
+    remaining.push(meta(pair.from, false, true));
+    remaining.push(meta(pair.to, false, true));
+  }
+  return {
+    ...addrs,
+    ix: new TransactionInstruction({
+      programId: opts.intentsProgramId,
+      keys: [
+        meta(opts.root, true, true),
+        meta(addrs.grokAccount, false, false),
+        meta(addrs.pumpTrader, false, true),
+        meta(SystemProgram.programId, false, false),
+        meta(new PublicKey(TOKEN_PROGRAM_ID), false, false),
+        meta(new PublicKey(TOKEN_2022_PROGRAM_ID), false, false),
+        ...remaining,
+      ],
+      data: Buffer.concat([Buffer.from(INTENTS_DISC.withdraw_pump_trader), encodeU64(opts.lamports)]),
+    }),
+  };
+}
+
 
 function assertOfficialPumpCreateAccounts(
   remaining: AccountMeta[],

@@ -67,6 +67,7 @@ export const INTENTS_DISC = {
   pump_create: Buffer.from([24, 176, 142, 141, 243, 152, 56, 128]),
   pump_amm_buy: Buffer.from([129, 59, 179, 195, 110, 135, 61, 2]),
   pump_amm_sell: Buffer.from([238, 234, 142, 38, 107, 206, 76, 195]),
+  withdraw_pump_trader: Buffer.from([188, 237, 135, 114, 143, 224, 45, 178]),
 } as const;
 
 /** Official pump.fun program. Only inner program pump_buy/pump_sell/pump_create CPI into. */
@@ -85,6 +86,7 @@ export const PUMP_DISC = {
 /** wSOL: PumpSwap's quote asset for pump coins. */
 export const WSOL_MINT = "So11111111111111111111111111111111111111112";
 export const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+export const TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 export const ASSOCIATED_TOKEN_PROGRAM_ID = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
 
 /**

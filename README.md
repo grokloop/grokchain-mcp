@@ -1,6 +1,51 @@
 # @grokchain/mcp
 
-Official Grok Chain MCP and Grok Build skill. Agents talk intents. They never hold keys.
+**Let an AI agent pay for things on Solana without ever giving it a wallet.**
+
+You keep the keys. You set a spending cap and a list of who may be paid. The
+agent signs intents; it never holds SOL, never pays gas, and cannot move money
+anywhere you did not approve. Revoke it in one transaction.
+
+Live on Solana mainnet. A real 0.01 USDC payment: [`4nhDmpmy…`](https://explorer.solana.com/tx/4nhDmpmyzMu9UkRcMphHb41fkgu7hXa3CfwvZ4SKDBcTMDLbHytJuAm46Hz6suFLCRu5Rw1fTipyjJUSnv1WxBBx)
+
+## What your agent can do
+
+- **Pay** — SOL (`pay`) or any SPL token including USDC (`pay_token`)
+- **Subscribe** — recurring payments that cannot be double-charged, enforced on chain
+- **Trade** — buy and sell tokens through Jupiter (`token_buy` / `token_sell`)
+- **Read payment requests** — parses Solana Pay links from a checkout page
+
+## What it deliberately cannot do
+
+- Pay anyone not on the allowlist you control
+- Spend past the cap you set, or after the grant expires
+- Hold a balance, or pay its own gas
+- Sign a transaction composed by someone else's server
+
+That last one is why Solana Pay *transaction requests* are refused: they ask a
+remote server to build what we sign. Transfer requests are parsed and checked.
+
+## The honest limit
+
+The allowlist holds **addresses**. Many Solana-accepting stores reuse one
+receiving address per merchant, so you approve them once and every later order
+works. Stores that generate a **fresh address per order** are not supported yet
+— approving those safely needs signed vouchers, which is not built.
+
+So: subscriptions, invoices, recurring bills and fixed vendors work today.
+Arbitrary checkout does not.
+
+## Quickstart
+
+```
+npx -y github:grokloop/grokchain-mcp grokchain setup --devnet
+```
+
+Rehearse on devnet first — it is free and the flow is identical. When it works,
+`setup --mainnet` does the same thing with real money, prints a plan, and waits
+for you to confirm before spending anything.
+
+---
 
 On **localnet**, CORE and INTENTS default to the local-only validator pair
 (`8WDhHSfrz6hMkmX7WteAAmyuWFLryHM2Kfc1r4k8EFXE` and

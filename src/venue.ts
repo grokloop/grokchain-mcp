@@ -16,6 +16,11 @@
  */
 import { Connection, PublicKey } from "@solana/web3.js";
 import {
+  BC_REAL_SOL_OFFSET,
+  BC_REAL_TOKEN_OFFSET,
+  BC_TOTAL_SUPPLY_OFFSET,
+  BC_VIRTUAL_SOL_OFFSET,
+  BC_VIRTUAL_TOKEN_OFFSET,
   BONDING_CURVE_COMPLETE_OFFSET,
   BONDING_CURVE_CREATOR_OFFSET,
   BONDING_CURVE_DISCRIMINATOR,
@@ -106,4 +111,41 @@ export async function resolveVenue(
       ? "bonding curve is complete: this coin graduated. buy_v2/sell_v2 would fail, so route to PumpSwap."
       : "bonding curve is still active: route to the pump.fun curve.",
   };
+}
+
+/**
+ * Full BondingCurve decode, including the reserve fields the routing check does
+ * not need but the exit ladder does. Same account, same verified layout; kept
+ * separate so routing stays a cheap flag read.
+ */
+export type BondingCurveState = {
+  virtualTokenReserves: bigint;
+  virtualSolReserves: bigint;
+  realTokenReserves: bigint;
+  realSolReserves: bigint;
+  tokenTotalSupply: bigint;
+  complete: boolean;
+  creator: string;
+};
+
+export function decodeBondingCurveFull(data: Buffer): BondingCurveState | undefined {
+  const head = decodeBondingCurve(data);
+  if (!head) return undefined;
+  return {
+    virtualTokenReserves: data.readBigUInt64LE(BC_VIRTUAL_TOKEN_OFFSET),
+    virtualSolReserves: data.readBigUInt64LE(BC_VIRTUAL_SOL_OFFSET),
+    realTokenReserves: data.readBigUInt64LE(BC_REAL_TOKEN_OFFSET),
+    realSolReserves: data.readBigUInt64LE(BC_REAL_SOL_OFFSET),
+    tokenTotalSupply: data.readBigUInt64LE(BC_TOTAL_SUPPLY_OFFSET),
+    complete: head.complete,
+    creator: head.creator,
+  };
+}
+
+/** Fraction of the curve completed, 0..1 — the sniper's "is it moving?" signal. */
+export function curveProgress(s: BondingCurveState): number {
+  if (s.complete) return 1;
+  const total = s.realSolReserves + s.virtualSolReserves;
+  if (total <= 0n) return 0;
+  return Number((s.realSolReserves * 10000n) / total) / 10000;
 }

@@ -111,9 +111,18 @@ export const ASSOCIATED_TOKEN_PROGRAM_ID = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTN
 
 /**
  * BondingCurve layout, decoded from a live mainnet account:
- * disc(8) + 5 x u64 + complete(1) + creator(32). complete === 1 means the coin
- * graduated and must be traded on the AMM instead.
+ * disc(8) + virtual_token(8) + virtual_sol(8) + real_token(8) + real_sol(8)
+ * + total_supply(8) + complete(1) + creator(32).
+ *
+ * complete === 1 means the coin graduated and must trade on the AMM. The reserve
+ * offsets are what marks a position; routing only needs the flag.
  */
+export const BC_VIRTUAL_TOKEN_OFFSET = 8;
+export const BC_VIRTUAL_SOL_OFFSET = 16;
+export const BC_REAL_TOKEN_OFFSET = 24;
+export const BC_REAL_SOL_OFFSET = 32;
+export const BC_TOTAL_SUPPLY_OFFSET = 40;
+
 export const BONDING_CURVE_DISCRIMINATOR = Buffer.from([23, 183, 248, 55, 96, 216, 172, 96]);
 export const BONDING_CURVE_COMPLETE_OFFSET = 48;
 export const BONDING_CURVE_CREATOR_OFFSET = 49;

@@ -15,6 +15,7 @@ import { pumpSellTool } from "./tools/pump_sell.js";
 import { pumpCreateTool } from "./tools/pump_create.js";
 import { pumpAmmBuyTool } from "./tools/pump_amm_buy.js";
 import { pumpAmmDeriveTool } from "./tools/pump_amm_derive.js";
+import { getPositionsTool } from "./tools/get_positions.js";
 import { pumpAmmSellTool } from "./tools/pump_amm_sell.js";
 import { getAccountTool, getGrantTool } from "./tools/reads.js";
 import { reviseGrantTool } from "./tools/revise_grant.js";
@@ -451,6 +452,17 @@ function buildServer(): McpServer {
       dry_run: z.boolean().optional(),
     },
     async (args) => jsonResult(await paySubscriptionTool(args)),
+  );
+
+  server.tool(
+    "get_positions",
+    "Read-only book for this vault pump-trader: native SOL plus every token position, across BOTH the classic Token and Token-2022 programs (a $GrokChain bag is Token-2022). Set marks:true to price each position from live reserves — bonding curve virtual reserves, or PumpSwap pool balances. Marks are pre-fee, so use them to decide whether to exit, not as a fill quote. This is the read an exit ladder runs on. Signs nothing.",
+    {
+      root: pubkey.optional(),
+      marks: z.boolean().optional().describe("Price each position from live reserves. Default true; costs a few RPC calls per mint."),
+      include_dust: z.boolean().optional().describe("Also list zero-balance token accounts (rent you can reclaim)."),
+    },
+    async (args) => jsonResult(await getPositionsTool(args)),
   );
 
   server.tool(

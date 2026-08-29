@@ -1,6 +1,6 @@
 # Getting started on Grok Chain (MAINNET)
 
-Pay, pump, pump_amm_buy, pump_amm_sell, call, and deploy are live on Solana MAINNET INTENTS `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw`. deploy is a grant event, not an ELF upload. swap is a grant-gated SOL min_out send, not an AMM. pump is official pump.fun curve. pump_amm_* is grant-gated PumpSwap. The human wallet is the only secret you keep. The bot never gets a seed.
+Pay, pump, pump_amm_buy, pump_amm_sell, call, and deploy are live on Solana MAINNET INTENTS `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw`. withdraw_pump_trader is root-only (human CLI), not an agent intent. issue_grant and create_account are grief-proof (claim a pre-funded PDA). deploy is a grant event, not an ELF upload. swap is a grant-gated SOL min_out send, not an AMM. pump is official pump.fun curve. pump_amm_* is grant-gated PumpSwap. The human wallet is the only secret you keep. The bot never gets a seed.
 
 There is no setup --mainnet yet. Do not use setup --devnet as the MAINNET path. Set env, then run the MCP:
 

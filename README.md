@@ -45,6 +45,7 @@ Chain pays.
 | call | implemented INTENTS client. amount 0 = policy ping. amount > 0 debits SpendVault. remaining empty = grant-checked only. **MAINNET**: live. |
 | pump_buy / pump_sell / pump_create | implemented INTENTS client. Official pump.fun buy_v2 / sell_v2 / create_v2. Trader PDA is user. Vault is never user. **MAINNET**: live on 3HCErAF. 27-account buy needs v0 + ALT on public RPC. Complete bonding curves cannot buy_v2. |
 | pump_amm_buy / pump_amm_sell | implemented INTENTS client. Grant-gated PumpSwap (post-graduation). Trader is remaining[1] only. Vault is never user. Buy remaining 26 (or 27 cashback). Sell remaining 24 (no volume accs). Do not pass buy's 26 to sell. Agent stays 0 SOL. Quote unwrap stays on the trader, not the vault. **MAINNET**: live on 3HCErAF. Not Jupiter. |
+| withdraw_pump_trader | implemented INTENTS client. Root-only, not grant-gated. SOL + token ATA sweep. Does not close trader. Human CLI: `grokchain vault withdraw-pump-trader [--lamports n] [--sol n] [--atas from,to,...]`. **MAINNET**: proven on 3HCErAF. Not an agent intent. |
 
 Optional read-only: get_account, get_grant.
 

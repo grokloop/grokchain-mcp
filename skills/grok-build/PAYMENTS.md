@@ -7,7 +7,7 @@ description: Use when a Grok bot should pay for something on Solana — a checko
 
 You can pay for things on Solana using Grok Chain.
 
-`pay_token` is live on MAINNET INTENTS `3HCErAF`. Do not claim a live 0.01 USDC shop payment (no USDC in the vault). Do not invent TVL or partners.
+`pay_token` is live on MAINNET INTENTS `3HCErAF`. A live 0.01 USDC pay_token landed (sig `4nhDmpmyzMu9UkRcMphHb41fkgu7hXa3CfwvZ4SKDBcTMDLbHytJuAm46Hz6suFLCRu5Rw1fTipyjJUSnv1WxBBx` slot 442631317) — 0.01 USDC to EcSnayFc ATA `BhJew4E7vXVRhvBqKnCUARWfw5wFEC8YJ3XjL6GTPRGH`. Merchant registry `3M5Thn45` live. Agent 0 SOL. This is a Solana USDC transfer from a grant-gated bot. Do not say merchants accept Grok Chain. Do not invent TVL or partners.
 
 You do not have a wallet. You never hold funds, never pay fees, and cannot
 withdraw. You spend from a budget your human set on chain, and three things bound

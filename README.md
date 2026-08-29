@@ -46,7 +46,7 @@ Chain pays.
 | call | implemented INTENTS client. amount 0 = policy ping. amount > 0 debits SpendVault. remaining empty = grant-checked only. **MAINNET**: live. |
 | pump_buy / pump_sell / pump_create | MCP client still in git. **MAINNET**: cut from the live 3HCErAF payments ELF for size. Do not send. Jupiter token_buy/token_sell stay. |
 | pump_amm_buy / pump_amm_sell | MCP client still in git. **MAINNET**: cut from the live 3HCErAF payments ELF for size. Do not send. Jupiter token_buy/token_sell still reach graduated pump coins. |
-| pay_token | implemented INTENTS client. SPL / Token-2022 to an approved merchant. **MAINNET**: live on 3HCErAF. Merchant registry + subscriptions on the same binary. Do not claim a live 0.01 USDC shop payment. |
+| pay_token | implemented INTENTS client. SPL / Token-2022 to an approved merchant. **MAINNET**: live on 3HCErAF. Merchant registry + subscriptions on the same binary. A live 0.01 USDC pay_token landed (sig 4nhDmpmy… slot 442631317) to EcSnayFc ATA BhJew4E7…. Merchant registry 3M5Thn45 live. Agent 0 SOL. This is a Solana USDC transfer from a grant-gated bot. Do not say merchants accept Grok Chain. Do not invent TVL or partners. |
 | withdraw_pump_trader | implemented INTENTS client. Root-only, not grant-gated. SOL + token ATA sweep. Does not close trader. Human CLI: `grokchain vault withdraw-pump-trader [--lamports n] [--sol n] [--atas from,to,...]`. **MAINNET**: proven on 3HCErAF. Not an agent intent. |
 
 Optional read-only: get_account, get_grant.

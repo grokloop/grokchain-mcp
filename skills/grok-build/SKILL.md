@@ -64,7 +64,7 @@ and subscriptions.
 | `create_subscription` / `cancel_subscription` | human root | Recurring. Bot cannot create or cancel. |
 | `list_subscriptions` / `pay_subscription` | agent | Settle one period. Pass the reported `period`. |
 
-`pay_token`, merchant registry, and subscriptions are live on MAINNET INTENTS `3HCErAF`. Do not claim a live 0.01 USDC shop payment (no USDC in the vault). Do not paste keys.
+`pay_token`, merchant registry, and subscriptions are live on MAINNET INTENTS `3HCErAF`. A live 0.01 USDC pay_token landed (sig `4nhDmpmy…` slot 442631317) to EcSnayFc ATA `BhJew4E7…`. Merchant registry `3M5Thn45` live. Agent 0 SOL. This is a Solana USDC transfer from a grant-gated bot. Do not say merchants accept Grok Chain. Do not invent TVL or partners. Do not paste keys.
 
 ## Never ask for keys. Never hold SOL.
 

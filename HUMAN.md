@@ -271,7 +271,7 @@ stays 0 SOL.
 
 ## Payments: one-off, checkout, and subscriptions
 
-The desk can pay real merchants in USDC (or any registered mint), not just trade. `pay_token` is live on MAINNET `3HCErAF`. Do not claim a live 0.01 USDC shop payment (no USDC in the vault).
+The desk can pay real merchants in USDC (or any registered mint), not just trade. `pay_token` is live on MAINNET `3HCErAF`. A live 0.01 USDC pay_token landed (sig `4nhDmpmy…` slot 442631317) to EcSnayFc ATA `BhJew4E7…`. Merchant registry `3M5Thn45` live. Agent 0 SOL. This is a Solana USDC transfer from a grant-gated bot. Do not say merchants accept Grok Chain. Do not invent TVL or partners.
 Three controls bound every payment, and only you can widen any of them:
 
 - **the grant cap** — total spend before you must re-authorise. For token

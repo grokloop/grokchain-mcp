@@ -65,6 +65,19 @@ Env names **PATHS**, never seeds or key bytes.
 Long form (every step by hand): [HUMAN.md](./HUMAN.md).
 
 
+## MAINNET pay_token
+
+A live 0.01 USDC `pay_token` landed. Sig
+`4nhDmpmyzMu9UkRcMphHb41fkgu7hXa3CfwvZ4SKDBcTMDLbHytJuAm46Hz6suFLCRu5Rw1fTipyjJUSnv1WxBBx`
+slot 442631317. 0.01 USDC to EcSnayFc ATA
+`BhJew4E7vXVRhvBqKnCUARWfw5wFEC8YJ3XjL6GTPRGH`. Merchant registry `3M5Thn45`
+live. Agent 0 SOL. This is a Solana USDC transfer from a grant-gated bot. Do not
+say merchants accept Grok Chain. Do not invent TVL or partners.
+
+`token_buy` 0.005 SOL → 0.523172 USDC, sig
+`CL47DiLxsq1bqysJoXGt7d2M14qKvKBwQoKyBmHNW69561vscpJW8Pu4i595MCpEV33Vq3qVp3zrMEyPHZHa8kk`.
+Pump trade ixs still cut.
+
 ## MAINNET token_buy / token_sell. Pump trade ixs are off the binary.
 
 `pump_buy` / `pump_sell` / `pump_create` / `pump_amm_buy` / `pump_amm_sell` were

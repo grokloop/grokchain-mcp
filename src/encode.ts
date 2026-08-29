@@ -231,3 +231,33 @@ export function encodePumpAmmSellArgs(args: {
     encodeU64(args.sponsorLamports),
   ]);
 }
+
+function encodeBorshBytes(data: Uint8Array): Buffer {
+  const len = Buffer.alloc(4);
+  len.writeUInt32LE(data.length, 0);
+  return Buffer.concat([len, Buffer.from(data)]);
+}
+
+/** Borsh TokenBuyArgs / TokenSellArgs: u64 in + u64 min + u64 sponsor + 2 pubkeys + bool + Vec<u8> */
+export function encodeTokenTradeArgs(args: {
+  inAmount: bigint | number | string;
+  minOut: bigint | number | string;
+  sponsorLamports: bigint | number | string;
+  inputMint: PublicKey;
+  outputMint: PublicKey;
+  wrapSol: boolean;
+  jupiterData: Uint8Array;
+}): Buffer {
+  return Buffer.concat([
+    encodeU64(args.inAmount),
+    encodeU64(args.minOut),
+    encodeU64(args.sponsorLamports),
+    encodePubkey(args.inputMint),
+    encodePubkey(args.outputMint),
+    encodeBool(args.wrapSol),
+    encodeBorshBytes(args.jupiterData),
+  ]);
+}
+
+export const encodeTokenBuyArgs = encodeTokenTradeArgs;
+export const encodeTokenSellArgs = encodeTokenTradeArgs;

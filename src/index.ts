@@ -19,6 +19,8 @@ import { pumpAmmSellTool } from "./tools/pump_amm_sell.js";
 import { getAccountTool, getGrantTool } from "./tools/reads.js";
 import { reviseGrantTool } from "./tools/revise_grant.js";
 import { revokeGrantTool } from "./tools/revoke_grant.js";
+import { tokenBuyTool } from "./tools/token_buy.js";
+import { tokenSellTool } from "./tools/token_sell.js";
 
 const pubkey = z.string().describe("Base58 Solana public key. Never a secret.");
 const lamports = z
@@ -283,6 +285,49 @@ function buildServer(): McpServer {
       dry_run: z.boolean().optional(),
     },
     async (args) => jsonResult(await pumpAmmSellTool(args)),
+  );
+
+  server.tool(
+    "token_buy",
+    "Tight INTENTS Jupiter v6 token_buy. Grant-gated. Fetches Jupiter quote + swap-instructions (lite-api.jup.ag/swap/v1, fallback quote-api.jup.ag/v6). remaining from that response. User/trader = pump-trader PDA. wrapAndUnwrapSol as needed; adapter wraps native SOL, does not unwrap. Quote mint may be WSOL, official USDC, or another SPL/Token-2022 mint. Paying with SOL/WSOL: check_grant(sol_in). Paying with USDC/other already on the trader: check_grant(0). Do not debit SpendVault for tokens already on the trader. Old swap is still a SOL send, not Jupiter. Agent signs. Relayer fee-pays. Agent stays 0 SOL. Not PumpPortal.",
+    {
+      input_mint: pubkey.optional().describe("Input mint. Defaults to WSOL (native SOL / wrapped SOL)."),
+      output_mint: pubkey.optional().describe("Output mint. Defaults to official USDC EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v."),
+      in_amount: z.union([z.number().int().positive(), z.string()]).describe("Exact in amount (raw units / lamports). Must match Jupiter inAmount."),
+      min_out: z.union([z.number().int().nonnegative(), z.string()]).optional().describe("Minimum out. Defaults to Jupiter otherAmountThreshold / outAmount."),
+      slippage_bps: z.union([z.number().int().nonnegative(), z.string()]).optional().describe("Jupiter slippage bps. Default 50."),
+      wrap_sol: z.boolean().optional().describe("Wrap native SOL onto trader WSOL ATA. Default true when input is WSOL."),
+      remaining_accounts: z
+        .array(z.union([pubkey, z.object({ pubkey, isSigner: z.boolean().optional(), isWritable: z.boolean().optional() })]))
+        .optional()
+        .describe("OPTIONAL. Jupiter swapInstruction accounts. Omit to fetch swap-instructions. Must include pump-trader. Must not include spend_vault."),
+      jupiter_data: z.string().optional().describe("OPTIONAL. Base64 Jupiter swapInstruction.data. Omit to fetch. Never empty on chain."),
+      sponsor_lamports: z.union([z.number().int().nonnegative(), z.string()]).optional(),
+      root: pubkey.optional(),
+      dry_run: z.boolean().optional(),
+    },
+    async (args) => jsonResult(await tokenBuyTool(args)),
+  );
+
+  server.tool(
+    "token_sell",
+    "Tight INTENTS Jupiter v6 token_sell. Grant-gated. Fetches Jupiter quote + swap-instructions. remaining from that response. User/trader = pump-trader PDA. Selling tokens for quote: check_grant(0). Selling WSOL/SOL for USDC: check_grant the SOL spent. Do not unwrap or sweep. Old swap is still a SOL send. Agent signs. Relayer fee-pays. Agent stays 0 SOL. Not PumpPortal.",
+    {
+      input_mint: pubkey.optional().describe("Input mint (token being sold). Defaults to official USDC."),
+      output_mint: pubkey.optional().describe("Output mint. Defaults to WSOL."),
+      in_amount: z.union([z.number().int().positive(), z.string()]).describe("Exact in amount (raw units). Must match Jupiter inAmount."),
+      min_out: z.union([z.number().int().nonnegative(), z.string()]).optional(),
+      slippage_bps: z.union([z.number().int().nonnegative(), z.string()]).optional(),
+      wrap_sol: z.boolean().optional().describe("Wrap native SOL when selling SOL. Default true when input is WSOL."),
+      remaining_accounts: z
+        .array(z.union([pubkey, z.object({ pubkey, isSigner: z.boolean().optional(), isWritable: z.boolean().optional() })]))
+        .optional(),
+      jupiter_data: z.string().optional(),
+      sponsor_lamports: z.union([z.number().int().nonnegative(), z.string()]).optional(),
+      root: pubkey.optional(),
+      dry_run: z.boolean().optional(),
+    },
+    async (args) => jsonResult(await tokenSellTool(args)),
   );
 
   server.tool(

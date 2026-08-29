@@ -68,6 +68,8 @@ export const INTENTS_DISC = {
   pump_amm_buy: Buffer.from([129, 59, 179, 195, 110, 135, 61, 2]),
   pump_amm_sell: Buffer.from([238, 234, 142, 38, 107, 206, 76, 195]),
   withdraw_pump_trader: Buffer.from([188, 237, 135, 114, 143, 224, 45, 178]),
+  token_buy: Buffer.from([116, 167, 118, 40, 127, 96, 55, 234]),
+  token_sell: Buffer.from([154, 76, 173, 221, 122, 208, 158, 103]),
 } as const;
 
 /** Official pump.fun program. Only inner program pump_buy/pump_sell/pump_create CPI into. */
@@ -85,6 +87,10 @@ export const PUMP_DISC = {
 
 /** wSOL: PumpSwap's quote asset for pump coins. */
 export const WSOL_MINT = "So11111111111111111111111111111111111111112";
+/** Official Circle USDC. token_buy/token_sell quote mint MAY be this, WSOL, or another mint. */
+export const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+/** Official Jupiter v6. Only inner program token_buy/token_sell CPI into. */
+export const JUPITER_V6_PROGRAM_ID = "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4";
 export const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 export const TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 export const ASSOCIATED_TOKEN_PROGRAM_ID = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";

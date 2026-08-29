@@ -58,6 +58,7 @@ Env names **PATHS**, never seeds or key bytes.
 - Local-only ids `8WDhHSfrz6hMkmX7WteAAmyuWFLryHM2Kfc1r4k8EFXE` and `AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2` are refused off localnet.
 - `deploy` is a grant event (`DeployRequested`). It does not upload an ELF.
 - `swap` is a grant-gated SOL min_out send. Not an AMM. Not Jupiter.
+- `token_buy` / `token_sell` are grant-gated Jupiter v6. Quote mint may be WSOL, USDC, or another mint. Old swap is still the SOL send.
 - `pump_buy` / `pump_sell` / `pump_create` are official pump.fun CPIs. Trader PDA is user. SpendVault is never user.
 - Migrated (complete) bonding curves cannot `buy_v2`. 27-account `pump_buy` needs a v0 transaction + address lookup table on public RPC.
 - `pump_amm_buy` / `pump_amm_sell` are grant-gated PumpSwap. Trader is remaining[1] only. Vault is never user. Buy remaining 26. Sell remaining 24 (no volume accs). Do not pass buy's 26 to sell. Agent stays 0 SOL. Quote unwrap stays on the trader, not the vault.
@@ -87,7 +88,7 @@ export GROKCHAIN_AGENT_KEYPAIR=$HOME/.config/grokchain/agent.json
 export GROKCHAIN_RELAYER_KEYPAIR=$HOME/.config/grokchain/relayer.json
 ```
 
-Do not Jupiter-swap and call it Grok Chain.
+Do not call the old `swap` intent a Jupiter swap. Jupiter lives on `token_buy` / `token_sell` only.
 
 ## MAINNET pump_amm (PumpSwap, graduated mint)
 
@@ -114,7 +115,7 @@ Proven MAINNET buy: `59PuJuszMqYMGmXwuuCD4aufwKK8ttZGjujvwGpq7q8t4bvDtfFeCTjfigx
 
 Proven MAINNET sell: `42mkDG4zb57MNBoMD2wKdGuRwz3oBdrgjmoWsb8Me4VRueF1PhJLu8iaoucuHc9CPLQ3e9AtLcj135SEY9KTDmRf` (PumpAmmSell + PumpSwap Sell + CheckGrant, Finalized). Trader `5QkJFdLm` native SOL 0.00089088 → 0.019022138. Unwrap stayed on trader, not vault. WSOL ATA closed. Agent still 0 SOL.
 
-Do not Jupiter-swap and call it Grok Chain.
+Do not call the old `swap` intent a Jupiter swap. Jupiter lives on `token_buy` / `token_sell` only.
 
 ## DEVNET rehearsal
 

@@ -27,6 +27,8 @@ import {
   withdrawPumpTraderTool,
   withdrawSpendVaultTool,
 } from "./tools/vaults.js";
+import { tokenBuyTool } from "./tools/token_buy.js";
+import { tokenSellTool } from "./tools/token_sell.js";
 
 function usage(): string {
   return `grokchain — human CLI for Grok Chain CORE + INTENTS
@@ -75,6 +77,9 @@ Commands:
       Generate a 0600 keystore. Prints pubkey only. Relayer is the fee payer.
   grokchain relayer pubkey
   grokchain status [--agent <pk>]
+  grokchain token-buy --in-amount <n> [--input-mint <pk>] [--output-mint <pk>] [--min-out <n>] [--slippage-bps <n>] [--wrap-sol|--no-wrap-sol]
+  grokchain token-sell --in-amount <n> [--input-mint <pk>] [--output-mint <pk>] [--min-out <n>] [--slippage-bps <n>]
+      Jupiter v6 via INTENTS. User is the pump-trader PDA. Old swap is still a SOL send.
   grokchain setup --devnet [--yes]
       One command on grokchain-devnet. Equivalent: setup --devnet or setup devnet.
       Only GROKCHAIN_ROOT_KEYPAIR (or ~/.config/solana/id.json) is required.
@@ -316,6 +321,38 @@ async function main(): Promise<void> {
   }
   if (cmd[0] === "status") {
     await status(flags);
+    return;
+  }
+  if (head === "token-buy") {
+    printJson(
+      await tokenBuyTool({
+        in_amount: req(flags, "in-amount"),
+        input_mint: typeof flags["input-mint"] === "string" ? flags["input-mint"] : undefined,
+        output_mint: typeof flags["output-mint"] === "string" ? flags["output-mint"] : undefined,
+        min_out: typeof flags["min-out"] === "string" ? flags["min-out"] : undefined,
+        slippage_bps: typeof flags["slippage-bps"] === "string" ? flags["slippage-bps"] : undefined,
+        wrap_sol: flags["no-wrap-sol"] === true ? false : flags["wrap-sol"] === true ? true : undefined,
+        sponsor_lamports: typeof flags["sponsor-lamports"] === "string" ? flags["sponsor-lamports"] : undefined,
+        root: typeof flags.root === "string" ? flags.root : undefined,
+        dry_run: dry(flags),
+      }),
+    );
+    return;
+  }
+  if (head === "token-sell") {
+    printJson(
+      await tokenSellTool({
+        in_amount: req(flags, "in-amount"),
+        input_mint: typeof flags["input-mint"] === "string" ? flags["input-mint"] : undefined,
+        output_mint: typeof flags["output-mint"] === "string" ? flags["output-mint"] : undefined,
+        min_out: typeof flags["min-out"] === "string" ? flags["min-out"] : undefined,
+        slippage_bps: typeof flags["slippage-bps"] === "string" ? flags["slippage-bps"] : undefined,
+        wrap_sol: flags["no-wrap-sol"] === true ? false : flags["wrap-sol"] === true ? true : undefined,
+        sponsor_lamports: typeof flags["sponsor-lamports"] === "string" ? flags["sponsor-lamports"] : undefined,
+        root: typeof flags.root === "string" ? flags.root : undefined,
+        dry_run: dry(flags),
+      }),
+    );
     return;
   }
   if (head === "root" || head === "agent" || head === "vault" || head === "paymaster" || head === "relayer") {

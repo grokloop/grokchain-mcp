@@ -218,3 +218,19 @@ test("cluster=devnet pay builds against real INTENTS and returns need_human with
     }
   }
 });
+
+test("token trade policy: zero in fails, wrap requires WSOL, USDC is grant 0", async () => {
+  const { validateTokenTrade } = await import("../src/policy.js");
+  const { USDC_MINT, WSOL_MINT } = await import("../src/constants.js");
+  let threw = false;
+  try {
+    validateTokenTrade({ inAmount: 0n, minOut: 0n, sponsorLamports: 0n, wrapSol: false, inputMint: WSOL_MINT, kind: "buy" });
+  } catch {
+    threw = true;
+  }
+  assert.equal(threw, true);
+  const sol = validateTokenTrade({ inAmount: 1n, minOut: 0n, sponsorLamports: 0n, wrapSol: true, inputMint: WSOL_MINT, kind: "buy" });
+  assert.equal(sol.warnings.some((w) => w.includes("Jupiter")), true);
+  const usdc = validateTokenTrade({ inAmount: 1n, minOut: 0n, sponsorLamports: 0n, wrapSol: false, inputMint: USDC_MINT, kind: "sell" });
+  assert.equal(usdc.warnings.some((w) => w.includes("check_grant(0)")), true);
+});

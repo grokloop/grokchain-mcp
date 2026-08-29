@@ -19,7 +19,8 @@ Use these names. Do not drop to raw Solana unless the human asked you to debug.
 | `revoke_grant` | human root | Mark the grant revoked |
 | `check_grant` | agent | Consume path. Increments `spent_lamports`. Does not move SOL. |
 | `pay` | agent signs; relayer fee-pays | **Implemented** INTENTS client. localnet: local-only INTENTS id. **devnet**: grokchain-devnet INTENTS id. Human-funded SpendVault → recipient. Bot never holds SOL. |
-| `swap` | agent signs; relayer fee-pays | Grant-gated SOL send with min_out. Not a DEX. Not Jupiter. Not SPL. |
+| `swap` | agent signs; relayer fee-pays | Grant-gated SOL send with min_out. Not a DEX. Not Jupiter. Not SPL. Unchanged. |
+| `token_buy` / `token_sell` | agent signs; relayer fee-pays | Grant-gated Jupiter v6. Quote mint may be WSOL, USDC, or another mint. remaining from Jupiter swap-instructions. Trader PDA is user. Old swap is still the SOL send. |
 | `deploy` | agent signs; relayer fee-pays | check_grant(0) + DeployRequested. Not a BPF deploy. No ELF. |
 | `call` | agent signs; relayer fee-pays | Grant-gated router. amount 0 = policy ping. CORE allowlists INTENTS, not the inner target. |
 | `pump_buy` / `pump_sell` / `pump_create` | agent signs; relayer fee-pays | Official pump.fun curve. Trader PDA is user. Vault never user. Live on MAINNET. Complete curves cannot buy_v2. |

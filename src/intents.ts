@@ -4,8 +4,8 @@ import {
   TransactionInstruction,
   type AccountMeta,
 } from "@solana/web3.js";
-import { INTENTS_DISC, PUMP_AMM_BUY_ACCOUNT_COUNT, PUMP_AMM_BUY_ACCOUNT_COUNT_CASHBACK, PUMP_AMM_PROGRAM_ID, PUMP_AMM_PROGRAM_INDEX, PUMP_AMM_SELL_ACCOUNT_COUNT, PUMP_AMM_USER_INDEX, PUMP_BUY_V2_ACCOUNT_COUNT, PUMP_CREATE_MINT_INDEX, PUMP_CREATE_USER_INDEX, PUMP_CREATE_V2_ACCOUNT_COUNT, PUMP_CREATE_V2_ACCOUNT_COUNT_WITH_QUOTE, PUMP_PROGRAM_ID, PUMP_SELL_V2_ACCOUNT_COUNT, PUMP_USER_INDEX, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "./constants.js";
-import { encodeCallArgs, encodeDeployArgs, encodePayArgs, encodePubkey, encodePumpAmmBuyArgs, encodePumpAmmSellArgs, encodePumpBuyArgs, encodePumpCreateArgs, encodePumpSellArgs, encodeSwapArgs, encodeU64 } from "./encode.js";
+import { INTENTS_DISC, JUPITER_V6_PROGRAM_ID, PUMP_AMM_BUY_ACCOUNT_COUNT, PUMP_AMM_BUY_ACCOUNT_COUNT_CASHBACK, PUMP_AMM_PROGRAM_ID, PUMP_AMM_PROGRAM_INDEX, PUMP_AMM_SELL_ACCOUNT_COUNT, PUMP_AMM_USER_INDEX, PUMP_BUY_V2_ACCOUNT_COUNT, PUMP_CREATE_MINT_INDEX, PUMP_CREATE_USER_INDEX, PUMP_CREATE_V2_ACCOUNT_COUNT, PUMP_CREATE_V2_ACCOUNT_COUNT_WITH_QUOTE, PUMP_PROGRAM_ID, PUMP_SELL_V2_ACCOUNT_COUNT, PUMP_USER_INDEX, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "./constants.js";
+import { encodeCallArgs, encodeDeployArgs, encodePayArgs, encodePubkey, encodePumpAmmBuyArgs, encodePumpAmmSellArgs, encodePumpBuyArgs, encodePumpCreateArgs, encodePumpSellArgs, encodeSwapArgs, encodeTokenTradeArgs, encodeU64 } from "./encode.js";
 import { grantPda, grokAccountPda, paymasterPda, pumpTraderPda, spendVaultPda } from "./pda.js";
 
 function meta(pubkey: PublicKey, isSigner: boolean, isWritable: boolean): AccountMeta {
@@ -924,4 +924,151 @@ export function buildPumpAmmSellIx(opts: {
       data,
     }),
   };
+}
+
+function tokenMouthKeys(opts: {
+  agent: PublicKey;
+  grokAccount: PublicKey;
+  grant: PublicKey;
+  coreProgramId: PublicKey;
+  intentsProgramId: PublicKey;
+  spendVault: PublicKey;
+  paymaster: PublicKey;
+  sponsorLamports: bigint | number | string;
+  feePayer?: PublicKey;
+}): AccountMeta[] {
+  const sk = sponsorKeys({
+    intentsProgramId: opts.intentsProgramId,
+    paymaster: opts.paymaster,
+    sponsorLamports: opts.sponsorLamports,
+    feePayer: opts.feePayer,
+  });
+  const feePayerKey = opts.feePayer ?? sk.feePayerKey;
+  const feePayerSigner = !!opts.feePayer;
+  return [
+    meta(opts.agent, true, false),
+    meta(opts.grokAccount, false, false),
+    meta(opts.grant, false, true),
+    meta(opts.coreProgramId, false, false),
+    meta(opts.intentsProgramId, false, false),
+    meta(opts.spendVault, false, true),
+    meta(SystemProgram.programId, false, false),
+    meta(new PublicKey(JUPITER_V6_PROGRAM_ID), false, false),
+    meta(sk.paymasterKey, false, true),
+    meta(feePayerKey, feePayerSigner, true),
+  ];
+}
+
+function assertTokenRemaining(
+  remaining: AccountMeta[],
+  pumpTrader: PublicKey,
+  spendVault: PublicKey,
+  kind: "buy" | "sell",
+): void {
+  if (remaining.length < 3) {
+    throw new Error(`token_${kind} remaining_accounts must come from Jupiter swap-instructions (got ${remaining.length})`);
+  }
+  if (!remaining.some((a) => a.pubkey.equals(pumpTrader))) {
+    throw new Error(`token_${kind} remaining_accounts must include the pump-trader PDA as Jupiter user`);
+  }
+  if (remaining.some((a) => a.pubkey.equals(spendVault))) {
+    throw new Error(`token_${kind} remaining_accounts must not include SpendVault`);
+  }
+}
+
+function buildTokenTradeIx(opts: {
+  coreProgramId: PublicKey;
+  intentsProgramId: PublicKey;
+  root: PublicKey;
+  agent: PublicKey;
+  inAmount: bigint | number | string;
+  minOut: bigint | number | string;
+  sponsorLamports: bigint | number | string;
+  inputMint: PublicKey;
+  outputMint: PublicKey;
+  wrapSol: boolean;
+  jupiterData: Uint8Array;
+  feePayer?: PublicKey;
+  remainingAccounts: AccountMeta[];
+  kind: "buy" | "sell";
+}): { ix: TransactionInstruction } & VaultAddrs {
+  const addrs = deriveIntentsAddrs({ ...opts, agent: opts.agent });
+  let remaining = opts.remainingAccounts;
+  if (opts.wrapSol && !remaining.some((a) => a.pubkey.equals(SystemProgram.programId))) {
+    remaining = [...remaining, meta(SystemProgram.programId, false, false)];
+  }
+  assertTokenRemaining(remaining, addrs.pumpTrader, addrs.spendVault, opts.kind);
+  const disc = opts.kind === "buy" ? INTENTS_DISC.token_buy : INTENTS_DISC.token_sell;
+  const keys: AccountMeta[] = [
+    ...tokenMouthKeys({
+      agent: opts.agent,
+      grokAccount: addrs.grokAccount,
+      grant: addrs.grant,
+      coreProgramId: opts.coreProgramId,
+      intentsProgramId: opts.intentsProgramId,
+      spendVault: addrs.spendVault,
+      paymaster: addrs.paymaster,
+      sponsorLamports: opts.sponsorLamports,
+      feePayer: opts.feePayer,
+    }),
+    ...remaining,
+  ];
+  const data = Buffer.concat([
+    Buffer.from(disc),
+    encodeTokenTradeArgs({
+      inAmount: opts.inAmount,
+      minOut: opts.minOut,
+      sponsorLamports: opts.sponsorLamports,
+      inputMint: opts.inputMint,
+      outputMint: opts.outputMint,
+      wrapSol: opts.wrapSol,
+      jupiterData: opts.jupiterData,
+    }),
+  ]);
+  return {
+    ...addrs,
+    ix: new TransactionInstruction({
+      programId: opts.intentsProgramId,
+      keys,
+      data,
+    }),
+  };
+}
+
+/** Tight INTENTS token_buy. remaining = Jupiter swap-instructions accounts. Inner program hardcoded JUP6. */
+export function buildTokenBuyIx(opts: {
+  coreProgramId: PublicKey;
+  intentsProgramId: PublicKey;
+  root: PublicKey;
+  agent: PublicKey;
+  inAmount: bigint | number | string;
+  minOut: bigint | number | string;
+  sponsorLamports: bigint | number | string;
+  inputMint: PublicKey;
+  outputMint: PublicKey;
+  wrapSol: boolean;
+  jupiterData: Uint8Array;
+  feePayer?: PublicKey;
+  remainingAccounts: AccountMeta[];
+}): { ix: TransactionInstruction } & VaultAddrs {
+  return buildTokenTradeIx({ ...opts, kind: "buy" });
+}
+
+/** Tight INTENTS token_sell. remaining = Jupiter swap-instructions accounts. Inner program hardcoded JUP6. */
+export function buildTokenSellIx(opts: {
+  coreProgramId: PublicKey;
+  intentsProgramId: PublicKey;
+  root: PublicKey;
+  agent: PublicKey;
+  inAmount: bigint | number | string;
+  minOut: bigint | number | string;
+  sponsorLamports: bigint | number | string;
+  inputMint: PublicKey;
+  outputMint: PublicKey;
+  wrapSol: boolean;
+  jupiterData: Uint8Array;
+  feePayer?: PublicKey;
+  remainingAccounts: AccountMeta[];
+}): { ix: TransactionInstruction } & VaultAddrs {
+  return buildTokenTradeIx({ ...opts, kind: "sell" });
 }

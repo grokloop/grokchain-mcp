@@ -483,3 +483,70 @@ test("pump_amm_buy/sell discriminators, remaining counts, trader is remaining[1]
     /24|volume|buy/,
   );
 });
+
+test("token_buy and token_sell discriminators match sha256 global: names", () => {
+  assert.deepEqual(Array.from(INTENTS_DISC.token_buy), [116, 167, 118, 40, 127, 96, 55, 234]);
+  assert.deepEqual(Array.from(INTENTS_DISC.token_sell), [154, 76, 173, 221, 122, 208, 158, 103]);
+});
+
+test("token trade args borsh and build ix remaining from Jupiter-shaped list", async () => {
+  const { encodeTokenTradeArgs } = await import("../src/encode.js");
+  const { buildTokenBuyIx, buildTokenSellIx, deriveIntentsAddrs } = await import("../src/intents.js");
+  const { JUPITER_V6_PROGRAM_ID, USDC_MINT, WSOL_MINT } = await import("../src/constants.js");
+  const inputMint = new PublicKey(WSOL_MINT);
+  const outputMint = new PublicKey(USDC_MINT);
+  const jupData = Buffer.concat([Buffer.alloc(8, 1), Buffer.from(Uint8Array.from([0x40, 0x42, 0x0f, 0, 0, 0, 0, 0]))]); // 1_000_000
+  const encoded = encodeTokenTradeArgs({
+    inAmount: 1_000_000,
+    minOut: 1,
+    sponsorLamports: 0,
+    inputMint,
+    outputMint,
+    wrapSol: true,
+    jupiterData: jupData,
+  });
+  assert.equal(encoded.readBigUInt64LE(0), 1_000_000n);
+  assert.equal(encoded.readBigUInt64LE(8), 1n);
+  assert.equal(encoded.readBigUInt64LE(16), 0n);
+  assert.equal(encoded[88], 1); // wrap_sol after 3*u64 + 2*pubkey
+  assert.equal(encoded.readUInt32LE(89), jupData.length);
+  const INTENTS = new PublicKey("AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2");
+  const addrs = deriveIntentsAddrs({ coreProgramId: PROGRAM, intentsProgramId: INTENTS, root: ROOT, agent: AGENT });
+  const remaining = [
+    { pubkey: addrs.pumpTrader, isSigner: true, isWritable: true },
+    { pubkey: new PublicKey(JUPITER_V6_PROGRAM_ID), isSigner: false, isWritable: false },
+    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+  ];
+  const buy = buildTokenBuyIx({
+    coreProgramId: PROGRAM,
+    intentsProgramId: INTENTS,
+    root: ROOT,
+    agent: AGENT,
+    inAmount: 1_000_000,
+    minOut: 1,
+    sponsorLamports: 0,
+    inputMint,
+    outputMint,
+    wrapSol: true,
+    jupiterData: jupData,
+    remainingAccounts: remaining,
+  });
+  assert.deepEqual(Array.from(buy.ix.data.subarray(0, 8)), Array.from(INTENTS_DISC.token_buy));
+  assert.equal(buy.ix.keys.some((k) => k.pubkey.equals(addrs.pumpTrader)), true);
+  assert.equal(buy.ix.keys.some((k) => k.pubkey.toBase58() === JUPITER_V6_PROGRAM_ID), true);
+  const sell = buildTokenSellIx({
+    coreProgramId: PROGRAM,
+    intentsProgramId: INTENTS,
+    root: ROOT,
+    agent: AGENT,
+    inAmount: 1_000_000,
+    minOut: 1,
+    sponsorLamports: 0,
+    inputMint: outputMint,
+    outputMint: inputMint,
+    wrapSol: false,
+    jupiterData: jupData,
+    remainingAccounts: remaining,
+  });
+  assert.deepEqual(Array.from(sell.ix.data.subarray(0, 8)), Array.from(INTENTS_DISC.token_sell));
+});

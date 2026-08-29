@@ -94,11 +94,13 @@ A bot `pay` / `pump_buy` / `pump_amm_buy` / `pump_amm_sell` / `call` / `deploy` 
 
 ### MAINNET pump
 
-Same env as pay. `init_pump_trader` once (root). Grant cap and SpendVault must cover `max_sol_cost`. Trader Token-2022 ATA is created by the client (relayer fee-pays). `remaining_accounts` is the official pump.fun list; `user` is the trader PDA, never the vault. Public RPC cannot fit a legacy 27-account `buy_v2` — send v0 + address lookup table. Complete bonding curves cannot `buy_v2`. Do not Jupiter-swap and call it Grok Chain.
+Same env as pay. `init_pump_trader` once (root). Grant cap and SpendVault must cover `max_sol_cost`. Trader Token-2022 ATA is created by the client (relayer fee-pays). `remaining_accounts` is the official pump.fun list; `user` is the trader PDA, never the vault. Public RPC cannot fit a legacy 27-account `buy_v2` — send v0 + address lookup table. Complete bonding curves cannot `buy_v2`. Do not call the old `swap` intent a Jupiter swap. Jupiter lives on `token_buy` / `token_sell` only.
 
 ### MAINNET pump_amm
 
 Same env as pay. Grant-gated PumpSwap. Trader is remaining[1] only. Vault is never user. Buy remaining 26 (or 27 cashback). Sell remaining 24 (no volume accs). Do not pass buy's 26 to sell. `remaining_accounts` is optional — omit it and the list is built from chain for this vault's pump-trader. Buy needs `fund_pump_trader` so the trader holds spendable WSOL quote. Sell grant amount is 0. Quote unwrap stays on the trader, not the vault. Agent stays 0 SOL. Not Jupiter. There is no wrap_sol/unwrap_sol intent.
+
+`token_buy` / `token_sell` are grant-gated Jupiter v6. MCP fetches quote + swap-instructions (lite-api.jup.ag/swap/v1). User/trader pubkey is the pump-trader PDA. wrapAndUnwrapSol as needed; the adapter wraps native SOL and does not unwrap. Quote mint may be WSOL, official USDC, or another SPL/Token-2022 mint. Paying with SOL/WSOL: check_grant(sol_in). Paying with USDC/other already on the trader: check_grant(0). Native SOL is prefunded via fund_pump_trader (no in-ix vault debit). Not PumpPortal. Old `swap` is still a SOL send.
 
 
 

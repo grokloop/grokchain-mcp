@@ -1,5 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
-import { FORBIDDEN_SECRET_FIELDS, MAX_ALLOWED_PROGRAMS, MAX_SPONSOR_LAMPORTS, PUMP_CREATE_NAME_MAX, PUMP_CREATE_SYMBOL_MAX, PUMP_CREATE_URI_MAX } from "./constants.js";
+import { FORBIDDEN_SECRET_FIELDS, MAX_ALLOWED_PROGRAMS, MAX_SPONSOR_LAMPORTS, PUMP_CREATE_NAME_MAX, WSOL_MINT, PUMP_CREATE_SYMBOL_MAX, PUMP_CREATE_URI_MAX } from "./constants.js";
 
 export class PolicyError extends Error {
   code: string;
@@ -354,6 +354,42 @@ export function validatePumpAmmSell(args: {
       "remaining_accounts must be official PumpSwap sell list: 24 (no volume accs). Do not pass buy's 26/27 — that shifts fee_config.",
       "Quote unwrap stays on the trader, not the vault. Agent stays 0 SOL. Not Jupiter.",
       "Live on MAINNET INTENTS 3HCErAF.",
+    ],
+  };
+}
+
+export function validateTokenTrade(args: {
+  inAmount: bigint;
+  minOut: bigint;
+  sponsorLamports: bigint;
+  wrapSol: boolean;
+  inputMint: string;
+  kind: "buy" | "sell";
+}): { warnings: string[] } {
+  if (args.inAmount <= 0n) {
+    throw new PolicyError("ZeroAmount", `token_${args.kind} in_amount must be greater than zero`);
+  }
+  if (args.sponsorLamports > BigInt(MAX_SPONSOR_LAMPORTS)) {
+    throw new PolicyError(
+      "SponsorCapExceeded",
+      `sponsor_lamports exceeds MAX_SPONSOR_LAMPORTS (${MAX_SPONSOR_LAMPORTS})`,
+    );
+  }
+  if (args.wrapSol && args.inputMint !== WSOL_MINT) {
+    throw new PolicyError("TokenWrapMintMustBeWsol", "wrap_sol requires input_mint to be wrapped SOL");
+  }
+  void args.minOut;
+  const solIn = args.wrapSol || args.inputMint === WSOL_MINT;
+  return {
+    warnings: [
+      `token_${args.kind} is a tight INTENTS adapter for official Jupiter v6. Not a general router. Not PumpSwap. Not PumpPortal.`,
+      solIn
+        ? "Paying with native SOL/WSOL: check_grant(in_amount). Native SOL is prefunded on the trader (fund_pump_trader). No in-ix vault debit."
+        : "Paying with a token already on the trader (USDC or other): check_grant(0). Do not debit SpendVault.",
+      "Pump-trader PDA is the Jupiter user. remaining_accounts come from Jupiter swap-instructions. Inner program is hardcoded JUP6.",
+      "Adapter wraps SOL when wrap_sol. Does not unwrap or sweep. Leftover stays on the trader. Client CreateIdempotent ATAs first.",
+      "Old swap is still a grant-gated SOL send. Not an AMM. Not Jupiter.",
+      "Agent stays 0 SOL. Relayer fee-pays. Live on MAINNET INTENTS 3HCErAF after upgrade.",
     ],
   };
 }

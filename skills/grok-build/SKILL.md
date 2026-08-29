@@ -50,6 +50,22 @@ On **devnet**, `create_account` / `issue_grant` / `revise_grant` / `revoke_grant
 Grant allowlist on devnet must use `EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz` (the devnet router), not the local-only `AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2`.
 
 
+
+## Paying shops
+
+Read `PAYMENTS.md` in this folder and follow it. That is the mouth for checkout
+and subscriptions.
+
+| Intent | Who | What |
+| --- | --- | --- |
+| `pay_request` | none | Parse a `solana:` transfer request. Signs nothing. |
+| `pay_token` | agent signs; relayer fee-pays | SPL / Token-2022 to an approved merchant. Pass the `reference`. |
+| `init_merchant_registry` / `add_merchant` / `remove_merchant` | human root | Payee allowlist. One mint per registry. |
+| `create_subscription` / `cancel_subscription` | human root | Recurring. Bot cannot create or cancel. |
+| `list_subscriptions` / `pay_subscription` | agent | Settle one period. Pass the reported `period`. |
+
+`pay_token` and subscriptions are in git on `grokchain-programs` / `grokchain-mcp`. They land on MAINNET INTENTS only after that binary is upgraded. Do not claim a live shop payment on `3HCErAF` until the upgrade is confirmed. Do not paste keys.
+
 ## Never ask for keys. Never hold SOL.
 
 Never ask for a seed, mnemonic, private key, secret key, or keypair JSON.

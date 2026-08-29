@@ -23,8 +23,8 @@ Use these names. Do not drop to raw Solana unless the human asked you to debug.
 | `token_buy` / `token_sell` | agent signs; relayer fee-pays | Grant-gated Jupiter v6. Quote mint may be WSOL, USDC, or another mint. remaining from Jupiter swap-instructions. Trader PDA is user. Old swap is still the SOL send. |
 | `deploy` | agent signs; relayer fee-pays | check_grant(0) + DeployRequested. Not a BPF deploy. No ELF. |
 | `call` | agent signs; relayer fee-pays | Grant-gated router. amount 0 = policy ping. CORE allowlists INTENTS, not the inner target. |
-| `pump_buy` / `pump_sell` / `pump_create` | agent signs; relayer fee-pays | Official pump.fun curve. Trader PDA is user. Vault never user. Live on MAINNET. Complete curves cannot buy_v2. |
-| `pump_amm_buy` / `pump_amm_sell` | agent signs; relayer fee-pays | Grant-gated PumpSwap. Live on MAINNET. Trader is remaining[1]. Vault never user. Buy remaining 26. Sell remaining 24. Agent stays 0 SOL. Not Jupiter. |
+| `pump_buy` / `pump_sell` / `pump_create` | — | **Cut from live MAINNET INTENTS** (size). Do not send. Graduated coins use `token_buy` / `token_sell`. |
+| `pump_amm_buy` / `pump_amm_sell` | — | **Cut from live MAINNET INTENTS** (size). Do not send. Jupiter `token_buy` / `token_sell` still reach graduated pump coins. |
 | `get_account` / `get_grant` | none | Optional reads |
 
 ## CORE + INTENTS by cluster
@@ -33,7 +33,7 @@ Use these names. Do not drop to raw Solana unless the human asked you to debug.
 - **devnet**: CORE `7UtafKBBWNHEXC9PaNXu8USdZqL6VEWupsL7rS6LeVDj` and INTENTS `EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz` are the grokchain-devnet deployed programs.
   - CORE explorer: https://explorer.solana.com/address/7UtafKBBWNHEXC9PaNXu8USdZqL6VEWupsL7rS6LeVDj?cluster=devnet
   - INTENTS explorer: https://explorer.solana.com/address/EYhYtqLViS4H3FNt1Q8nGRHGt9oD87uaNsV2WJMNiRkz?cluster=devnet
-- **mainnet-beta**: CORE `44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd` and INTENTS `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw` (pay + pump + pump_amm + call + deploy).
+- **mainnet-beta**: CORE `44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd` and INTENTS `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw` (pay, pay_token, merchant registry, subscriptions, token_buy/token_sell, swap, deploy, call, init/fund/withdraw_pump_trader). Pump trade ixs are off this binary.
   - CORE explorer: https://explorer.solana.com/address/44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd
   - INTENTS explorer: https://explorer.solana.com/address/3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw
 - Do not invent a program id.
@@ -64,7 +64,7 @@ and subscriptions.
 | `create_subscription` / `cancel_subscription` | human root | Recurring. Bot cannot create or cancel. |
 | `list_subscriptions` / `pay_subscription` | agent | Settle one period. Pass the reported `period`. |
 
-`pay_token` and subscriptions are in git on `grokchain-programs` / `grokchain-mcp`. They land on MAINNET INTENTS only after that binary is upgraded. Do not claim a live shop payment on `3HCErAF` until the upgrade is confirmed. Do not paste keys.
+`pay_token`, merchant registry, and subscriptions are live on MAINNET INTENTS `3HCErAF`. Do not claim a live 0.01 USDC shop payment (no USDC in the vault). Do not paste keys.
 
 ## Never ask for keys. Never hold SOL.
 
@@ -127,23 +127,18 @@ When you describe a grant or an approval, show:
 
 Do not show, request, or log seed material.
 
-## Graduated coins: which mouth, and who builds the list
+## Graduated coins: which mouth
 
 A pump.fun coin leaves its bonding curve when the curve completes. After that
 `buy_v2` / `sell_v2` fail. **$GrokChain is already graduated.**
 
-- `pump_buy` / `pump_sell` — bonding curve only. If the coin graduated these now
-  stop with `CoinGraduated` and name the tool to use. They do **not** burn a
-  transaction finding out. Pass `venue:"curve"` to force the old behaviour.
-- `pump_amm_buy` / `pump_amm_sell` — PumpSwap, for graduated coins.
-  **You do not build `remaining_accounts`.** Omit it and the list is resolved
-  from chain state for this vault's pump-trader. Only supply one to override.
-  Quote is WSOL. Fund the trader with `fund_pump_trader`. Buy remaining 26
-  (or 27 cashback) / sell remaining 24. Not Jupiter. There is no wrap_sol /
-  unwrap_sol intent on this binary.
-- `pump_amm_derive` — read-only; shows the pool and the exact list.
+- `pump_buy` / `pump_sell` / `pump_create` / `pump_amm_buy` / `pump_amm_sell`
+  were **cut from the live MAINNET binary** for size. Do not send them.
+- `token_buy` / `token_sell` — Jupiter v6. This is the live mouth for graduated
+  pump coins. Fund the trader with `fund_pump_trader`. Quote mint may be WSOL,
+  official USDC, or another mint. Old `swap` is still a SOL send.
 
-Report the `venue` and `pool` from the result so the human knows which mouth ran.
+Report the mint and the signature so the human knows what landed.
 
 ## Knowing what you hold
 

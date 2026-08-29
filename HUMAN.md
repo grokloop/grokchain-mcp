@@ -9,7 +9,7 @@ On **localnet**, CORE and INTENTS default to the local-only validator pair. Thos
 - Local-only CORE (localnet only): `8WDhHSfrz6hMkmX7WteAAmyuWFLryHM2Kfc1r4k8EFXE`
 - Local-only INTENTS (localnet only): `AXprcURLhSqj35v9DJyBkTSPGSoZ9AfTRxYyguQJwnT2`
 
-On **MAINNET**, CORE and INTENTS are the deployed programs (pay + pump + pump_amm + call + deploy):
+On **MAINNET**, CORE and INTENTS are the deployed programs (pay, pay_token, token_buy/token_sell, swap, call, deploy; pump trade ixs cut for size):
 
 - CORE: `44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd`
   https://explorer.solana.com/address/44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd
@@ -29,7 +29,7 @@ Human funds **two** vaults: SpendVault (pay source) and Paymaster (gas). Two dep
 
 Grant allowlist is **router mode**: allowlist the INTENTS program id for this cluster, not SystemProgram and not every inner DEX.
 
-On **MAINNET**, create/issue/revise/revoke/check_grant, pay/vaults, pump_buy/sell/create, pump_amm_buy/sell, call, and deploy are implemented clients against the real deployed ids. They land only if the human has rooted the account, issued a grant allowlisting the **MAINNET INTENTS** id `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw`, funded SpendVault + Paymaster, and set `GROKCHAIN_RELAYER_KEYPAIR`. Otherwise `need_human_signature` / `need_human_setup`. `deploy` is a grant event, not an ELF upload. `swap` is SOL min_out, not an AMM. `pump_*` is official pump.fun (trader is user). Each root funds their own vault, paymaster, and relayer. Do not send SOL to `EcSnayFcwspNch8ChurzLwmg8zAsRPLtysUrf1QuPtXX` or `E8Pm8RG6L2qxLKTtMgYr8JQgJJtbRTzyKCdJRiPQSL1z`.
+On **MAINNET**, create/issue/revise/revoke/check_grant, pay/vaults, pay_token, merchant registry, subscriptions, token_buy/token_sell, swap, call, and deploy are implemented clients against the real deployed ids. They land only if the human has rooted the account, issued a grant allowlisting the **MAINNET INTENTS** id `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw`, funded SpendVault + Paymaster, and set `GROKCHAIN_RELAYER_KEYPAIR`. Otherwise `need_human_signature` / `need_human_setup`. `deploy` is a grant event, not an ELF upload. `swap` is SOL min_out, not an AMM. `pump_buy` / `pump_sell` / `pump_create` / `pump_amm_buy` / `pump_amm_sell` were cut from the live binary for size. Jupiter `token_buy` / `token_sell` still reach graduated pump coins. Each root funds their own vault, paymaster, and relayer. Do not send SOL to `EcSnayFcwspNch8ChurzLwmg8zAsRPLtysUrf1QuPtXX` or `E8Pm8RG6L2qxLKTtMgYr8JQgJJtbRTzyKCdJRiPQSL1z`.
 
 ## 1. Install Solana CLI. Use your own wallet.
 
@@ -90,17 +90,13 @@ export GROKCHAIN_AGENT_KEYPAIR="$HOME/.config/grokchain/agent.json"
 export GROKCHAIN_RELAYER_KEYPAIR="$HOME/.config/grokchain/relayer.json"
 ```
 
-A bot `pay` / `pump_buy` / `pump_amm_buy` / `pump_amm_sell` / `call` / `deploy` on MAINNET **builds** against the real INTENTS id. It **lands** only after you complete the root / grant / vault / paymaster / relayer setup below. Missing any of those returns `need_human_signature` or `need_human_setup`. Do not fake a send. Each root funds their own vault, paymaster, and relayer. Do not send SOL to `EcSnayFcwspNch8ChurzLwmg8zAsRPLtysUrf1QuPtXX` or `E8Pm8RG6L2qxLKTtMgYr8JQgJJtbRTzyKCdJRiPQSL1z`.
+A bot `pay` / `pay_token` / `token_buy` / `token_sell` / `call` / `deploy` on MAINNET **builds** against the real INTENTS id. It **lands** only after you complete the root / grant / vault / paymaster / relayer setup below. Missing any of those returns `need_human_signature` or `need_human_setup`. Do not fake a send. Each root funds their own vault, paymaster, and relayer. Do not send SOL to `EcSnayFcwspNch8ChurzLwmg8zAsRPLtysUrf1QuPtXX` or `E8Pm8RG6L2qxLKTtMgYr8JQgJJtbRTzyKCdJRiPQSL1z`.
 
-### MAINNET pump
+### MAINNET token_buy / token_sell (live). Pump trade ixs (cut)
 
-Same env as pay. `init_pump_trader` once (root). Grant cap and SpendVault must cover `max_sol_cost`. Trader Token-2022 ATA is created by the client (relayer fee-pays). `remaining_accounts` is the official pump.fun list; `user` is the trader PDA, never the vault. Public RPC cannot fit a legacy 27-account `buy_v2` — send v0 + address lookup table. Complete bonding curves cannot `buy_v2`. Do not call the old `swap` intent a Jupiter swap. Jupiter lives on `token_buy` / `token_sell` only.
+`pump_buy` / `pump_sell` / `pump_create` / `pump_amm_buy` / `pump_amm_sell` were **cut from the live MAINNET binary** for size. Do not send them. Historical txs on those ixs stay as history, not as current mouth.
 
-### MAINNET pump_amm
-
-Same env as pay. Grant-gated PumpSwap. Trader is remaining[1] only. Vault is never user. Buy remaining 26 (or 27 cashback). Sell remaining 24 (no volume accs). Do not pass buy's 26 to sell. `remaining_accounts` is optional — omit it and the list is built from chain for this vault's pump-trader. Buy needs `fund_pump_trader` so the trader holds spendable WSOL quote. Sell grant amount is 0. Quote unwrap stays on the trader, not the vault. Agent stays 0 SOL. Not Jupiter. There is no wrap_sol/unwrap_sol intent.
-
-`token_buy` / `token_sell` are grant-gated Jupiter v6. MCP fetches quote + swap-instructions (lite-api.jup.ag/swap/v1). User/trader pubkey is the pump-trader PDA. wrapAndUnwrapSol as needed; the adapter wraps native SOL and does not unwrap. Quote mint may be WSOL, official USDC, or another SPL/Token-2022 mint. Paying with SOL/WSOL: check_grant(sol_in). Paying with USDC/other already on the trader: check_grant(0). Native SOL is prefunded via fund_pump_trader (no in-ix vault debit). Not PumpPortal. Old `swap` is still a SOL send.
+`token_buy` / `token_sell` are grant-gated Jupiter v6 and still reach graduated pump coins. MCP fetches quote + swap-instructions (lite-api.jup.ag/swap/v1). User/trader pubkey is the pump-trader PDA. wrapAndUnwrapSol as needed; the adapter wraps native SOL and does not unwrap. Quote mint may be WSOL, official USDC, or another SPL/Token-2022 mint. Paying with SOL/WSOL: check_grant(sol_in). Paying with USDC/other already on the trader: check_grant(0). Native SOL is prefunded via fund_pump_trader (no in-ix vault debit). Not PumpPortal. Old `swap` is still a SOL send. `init_pump_trader` / `fund_pump_trader` / `withdraw_pump_trader` stay on the binary.
 
 
 
@@ -258,47 +254,24 @@ Cursor / MCP host config (stdio). Point env at **paths**:
 
 For DEVNET rehearsal, set `GROKCHAIN_CLUSTER` to `devnet` and `GROKCHAIN_RPC_URL` to `https://api.devnet.solana.com`. For localnet, set `GROKCHAIN_CLUSTER` to `localnet` and `GROKCHAIN_RPC_URL` to `http://127.0.0.1:8899`.
 
-`create_account` / `issue_grant` / `revise_grant` / `revoke_grant` still need the human root. `pay` / `swap` / `deploy` / `call` are implemented against INTENTS: the agent signs, the relayer is the fee payer, SpendVault is the SOL source when amount > 0. The bot never holds SOL. v1 swap is a grant-gated SOL send (not a DEX). v1 deploy is a request event (not a BPF deploy). v1 call is a grant-gated router (amount 0 = policy ping). swap / deploy / call are not on this public INTENTS binary. Do not claim they are live on MAINNET.
+`create_account` / `issue_grant` / `revise_grant` / `revoke_grant` still need the human root. `pay` / `pay_token` / `swap` / `deploy` / `call` / `token_buy` / `token_sell` are implemented against INTENTS: the agent signs, the relayer is the fee payer, SpendVault is the SOL source when amount > 0. The bot never holds SOL. v1 swap is a grant-gated SOL send (not a DEX). v1 deploy is a request event (not a BPF deploy). v1 call is a grant-gated router (amount 0 = policy ping). Those ixs are on the live MAINNET payments ELF. `pump_buy` / `pump_amm_*` are not.
 
 If a required keypair path is missing, or vaults / paymaster / grant are not set up, the tool returns `need_human_signature` or `need_human_setup` with an unsigned tx (base64) and a pointer back here. Never paste a seed into the bot. Never ask the bot for a key.
 
-## Post-bond coins: you no longer build the account list
+## Graduated coins: Jupiter, not pump_* 
 
-`pump_amm_buy` / `pump_amm_sell` trade a **graduated** coin on PumpSwap.
-`$GrokChain` is graduated — its bonding curve reads `complete = 1` with no SOL
-left — so the curve path cannot buy it.
+`$GrokChain` is graduated. `pump_buy` / `pump_sell` / `pump_create` /
+`pump_amm_buy` / `pump_amm_sell` were **cut from the live MAINNET binary** for
+size. Do not send them.
 
-`remaining_accounts` is now **optional**. Omit it and the list is resolved from
-chain state for your vault's pump-trader:
-
-- the pool is derived (`["pool", 0, pool-authority, base, quote]`) and confirmed
-  on chain, then decoded for the pool token accounts and `coin_creator`;
-- your trader's ATAs are derived using **the mint's own token program** —
-  `$GrokChain` is Token-2022, and deriving with the classic program silently
-  produces the wrong account;
-- the venue-global slots (fee recipients, event authority, fee config) are copied
-  from a recent successful trade on the same pool, so pump.fun's own rotation is
-  followed rather than guessed, and any accounts pump.fun appends are picked up
-  automatically.
-
-`pump_amm_derive` shows you exactly what would be submitted, and signs nothing.
-
-`pump_buy` / `pump_sell` now check the curve first and stop with `CoinGraduated`
-naming the tool to use, instead of spending a transaction to discover it.
-
-Honest facts before funding:
-
-- **The AMM's quote leg is WSOL, not native SOL.** `fund_pump_trader` is the
-  live INTENTS ix that puts spendable quote on the trader. There is no
-  `wrap_sol` / `unwrap_sol` intent on this binary. Do not invent one.
-- **Buy remaining is 26 (or 27 cashback). Sell remaining is 24.** Do not pass
-  buy's 26 to sell. Not Jupiter.
-- Size the **grant cap** to what you can lose. Quote unwrap stays on the trader,
-  not the vault. Agent stays 0 SOL.
+Use `token_buy` / `token_sell` (Jupiter v6). Fund the trader with
+`fund_pump_trader`. There is no `wrap_sol` / `unwrap_sol` intent on this
+binary. Do not invent one. Size the grant cap to what you can lose. Agent
+stays 0 SOL.
 
 ## Payments: one-off, checkout, and subscriptions
 
-The desk can pay real merchants in USDC (or any registered mint), not just trade.
+The desk can pay real merchants in USDC (or any registered mint), not just trade. `pay_token` is live on MAINNET `3HCErAF`. Do not claim a live 0.01 USDC shop payment (no USDC in the vault).
 Three controls bound every payment, and only you can widen any of them:
 
 - **the grant cap** — total spend before you must re-authorise. For token

@@ -8,7 +8,7 @@ On **localnet**, CORE and INTENTS default to the local-only validator pair
 They are not a deployed program. They are not on devnet. They are not on
 mainnet. Do not treat them as live.
 
-On **MAINNET**, CORE and INTENTS are the deployed programs (pay + pump + pump_amm + token_buy/token_sell + call + deploy):
+On **MAINNET**, CORE and INTENTS are the deployed programs (pay, pay_token, token_buy/token_sell, swap, call, deploy; pump trade ixs cut for size):
 
 - CORE: `44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd`
   https://explorer.solana.com/address/44fxwzuEyNxZtgDr87mTtMYYJ1LJm6cB5aZNLyBsPjNd
@@ -44,8 +44,9 @@ Chain pays.
 | token_buy / token_sell | implemented INTENTS client. Grant-gated **Jupiter v6** (`JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4`). Fetches lite-api.jup.ag/swap/v1 quote + swap-instructions (fallback quote-api.jup.ag/v6). remaining from that response. User is the pump-trader PDA. Quote mint may be WSOL, official USDC, or another SPL/Token-2022 mint. SOL/WSOL in: check_grant(sol). USDC/other already on trader: check_grant(0). Adapter wraps SOL; does not unwrap. Not PumpPortal. Old `swap` is still the SOL send. |
 | deploy | implemented INTENTS client. check_grant(0) + DeployRequested. **Not a BPF deploy. No ELF.** **MAINNET**: live as a grant event. |
 | call | implemented INTENTS client. amount 0 = policy ping. amount > 0 debits SpendVault. remaining empty = grant-checked only. **MAINNET**: live. |
-| pump_buy / pump_sell / pump_create | implemented INTENTS client. Official pump.fun buy_v2 / sell_v2 / create_v2. Trader PDA is user. Vault is never user. **MAINNET**: live on 3HCErAF. 27-account buy needs v0 + ALT on public RPC. Complete bonding curves cannot buy_v2. |
-| pump_amm_buy / pump_amm_sell | implemented INTENTS client. Grant-gated PumpSwap (post-graduation). Trader is remaining[1] only. Vault is never user. Buy remaining 26 (or 27 cashback). Sell remaining 24 (no volume accs). Do not pass buy's 26 to sell. Agent stays 0 SOL. Quote unwrap stays on the trader, not the vault. **MAINNET**: live on 3HCErAF. Not Jupiter. |
+| pump_buy / pump_sell / pump_create | MCP client still in git. **MAINNET**: cut from the live 3HCErAF payments ELF for size. Do not send. Jupiter token_buy/token_sell stay. |
+| pump_amm_buy / pump_amm_sell | MCP client still in git. **MAINNET**: cut from the live 3HCErAF payments ELF for size. Do not send. Jupiter token_buy/token_sell still reach graduated pump coins. |
+| pay_token | implemented INTENTS client. SPL / Token-2022 to an approved merchant. **MAINNET**: live on 3HCErAF. Merchant registry + subscriptions on the same binary. Do not claim a live 0.01 USDC shop payment. |
 | withdraw_pump_trader | implemented INTENTS client. Root-only, not grant-gated. SOL + token ATA sweep. Does not close trader. Human CLI: `grokchain vault withdraw-pump-trader [--lamports n] [--sol n] [--atas from,to,...]`. **MAINNET**: proven on 3HCErAF. Not an agent intent. |
 
 Optional read-only: get_account, get_grant.
@@ -67,7 +68,7 @@ Real MAINNET program ids:
 
 There is no `setup --mainnet`. Do not use `setup --devnet` as the MAINNET path. Each root funds their own vault, paymaster, and relayer. Do not send SOL to `EcSnayFcwspNch8ChurzLwmg8zAsRPLtysUrf1QuPtXX` or `E8Pm8RG6L2qxLKTtMgYr8JQgJJtbRTzyKCdJRiPQSL1z`.
 
-On **MAINNET**, create/issue/revise/revoke/check_grant, pay/vaults, pump_buy/sell/create, pump_amm_buy/sell, call, and deploy are implemented clients against the real deployed ids. They land only if the human has rooted the account, issued a grant allowlisting the **MAINNET INTENTS** id `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw`, funded SpendVault + Paymaster, and set RELAYER_KEYPAIR. Otherwise need_human_signature / need_human_setup. deploy is a grant event, not an ELF upload. swap is SOL min_out, not an AMM.
+On **MAINNET**, create/issue/revise/revoke/check_grant, pay/vaults, pay_token, token_buy/token_sell, swap, call, and deploy are implemented clients against the real deployed ids. pump_buy / pump_amm_* were cut from the live binary for size. Live clients land only if the human has rooted the account, issued a grant allowlisting the **MAINNET INTENTS** id `3HCErAFs93FMk2J25Qq1xRRMp6B4FyGvif8ZV8hYxQKw`, funded SpendVault + Paymaster, and set RELAYER_KEYPAIR. Otherwise need_human_signature / need_human_setup. deploy is a grant event, not an ELF upload. swap is SOL min_out, not an AMM.
 
 ## DEVNET rehearsal
 
@@ -102,7 +103,7 @@ swap/deploy/call are implemented clients in this source. They were not upgraded 
 
 See [GETTING-STARTED.md](./GETTING-STARTED.md). Human wallet is the only secret they keep.
 Agent and relayer are host files mode 0600. Relayer pays fees. Human funds vaults.
-Bot never holds SOL. CORE/INTENTS ids are the real MAINNET ones. swap/deploy/call are not on this public INTENTS binary. There is no setup --mainnet. Set CLUSTER, RPC, PROGRAM_ID, INTENTS, ROOT_KEYPAIR, then run the MCP. DEVNET rehearsal still has setup --devnet.
+Bot never holds SOL. CORE/INTENTS ids are the real MAINNET ones. swap/deploy/call/pay_token are on the live MAINNET payments ELF. pump_buy / pump_amm_* are not. There is no setup --mainnet. Set CLUSTER, RPC, PROGRAM_ID, INTENTS, ROOT_KEYPAIR, then run the MCP. DEVNET rehearsal still has setup --devnet.
 
 ```bash
 export GROKCHAIN_CLUSTER=mainnet-beta

@@ -11,7 +11,7 @@ import {
   PUMP_DISC,
   PUMP_PROGRAM_ID,
 } from "../src/constants.js";
-import { buildCallIx, buildDeployIx, buildInitPaymasterIx, buildInitSpendVaultIx, buildPayIx, buildPumpAmmBuyIx, buildPumpAmmSellIx, buildPumpBuyIx, buildPumpSellIx, buildSwapIx } from "../src/intents.js";
+import { buildCallIx, buildDeployIx, buildInitPaymasterIx, buildInitSpendVaultIx, buildPayIx, buildPumpAmmBuyIx, buildPumpAmmSellIx, buildPumpBuyIx, buildPumpSellIx, buildSwapIx, deriveIntentsAddrs } from "../src/intents.js";
 import { grantPda, grokAccountPda, paymasterPda, pumpTraderPda, spendVaultPda } from "../src/pda.js";
 import {
   buildCheckGrantIx,
@@ -336,7 +336,47 @@ test("pump_buy discriminator and args; user must be trader; target != pump fails
   assert.equal(built.ix.keys[0]!.pubkey.equals(AGENT), true);
   assert.equal(built.ix.keys[0]!.isSigner, true);
   assert.equal(built.ix.keys[0]!.isWritable, false);
-  assert.equal(built.ix.keys[8]!.pubkey.equals(pump), true);
+
+  // The named accounts ARE the PumpTrade struct, in its order, and there are
+  // exactly ten of them before remaining_accounts begins. This used to assert
+  // only that pump_program sat at index 8, which held because the builder
+  // wrongly inserted the pump-trader PDA at index 6 — the trader belongs in
+  // remaining_accounts alone. That off-by-one put the trader where the program
+  // expected system_program, and every pump ix failed with InvalidProgramId
+  // (3008) on chain while the narrow assertion still passed. Pin the whole
+  // mouth so a shift cannot hide again.
+  const addrs = deriveIntentsAddrs({
+    coreProgramId: PROGRAM,
+    intentsProgramId: INTENTS,
+    root: ROOT,
+    agent: AGENT,
+  });
+  const mouth = built.ix.keys.slice(0, 10).map((k) => k.pubkey.toBase58());
+  assert.deepEqual(mouth, [
+    AGENT.toBase58(),
+    addrs.grokAccount.toBase58(),
+    addrs.grant.toBase58(),
+    PROGRAM.toBase58(),
+    INTENTS.toBase58(),
+    addrs.spendVault.toBase58(),
+    SystemProgram.programId.toBase58(),
+    pump.toBase58(),
+    // sponsor_lamports is 0 here, so the optional paymaster is None — Anchor
+    // marks an absent optional account with the program id, not the PDA.
+    INTENTS.toBase58(),
+    built.ix.keys[9]!.pubkey.toBase58(),
+  ]);
+  assert.notEqual(
+    built.ix.keys[8]!.pubkey.toBase58(),
+    addrs.paymaster.toBase58(),
+    "an unsponsored call must not claim the paymaster account",
+  );
+  assert.equal(
+    mouth.includes(addrs.pumpTrader.toBase58()),
+    false,
+    "the pump-trader PDA reaches the program through remaining_accounts only",
+  );
+  assert.equal(built.ix.keys[7]!.pubkey.equals(pump), true);
 
   const badUser = remaining.map((a, i) => (i === 13 ? { ...a, pubkey: AGENT } : a));
   assert.throws(

@@ -12,7 +12,7 @@ import { deployTool } from "./tools/deploy.js";
 import { swapTool } from "./tools/swap.js";
 import { pumpBuyTool } from "./tools/pump_buy.js";
 import { pumpSellTool } from "./tools/pump_sell.js";
-import { pumpCreateTool } from "./tools/pump_create.js";
+import { pumpCreateDeriveTool, pumpCreateTool } from "./tools/pump_create.js";
 import { pumpAmmBuyTool } from "./tools/pump_amm_buy.js";
 import { pumpAmmDeriveTool } from "./tools/pump_amm_derive.js";
 import { getPositionsTool } from "./tools/get_positions.js";
@@ -158,7 +158,7 @@ function buildServer(): McpServer {
 
   server.tool(
     "pump_buy",
-    "Tight INTENTS pump.fun buy_v2 adapter. Grant-gated. Live on MAINNET INTENTS 3HCErAF. Pump-trader PDA is pump user (invoke_signed trader seeds). remaining_accounts must be the official 27-account buy_v2 list with user=pump-trader (not SpendVault). Agent signs. Relayer fee-pays. Bot never holds SOL. Not a general router. Not Jupiter. 27 remaining accounts need a v0 tx + address lookup table on public RPC. Complete bonding curves cannot buy_v2.",
+    "Tight INTENTS pump.fun buy_v2 adapter. NOT ON THE LIVE PROGRAM. The four pump TRADE ixs were cut from the MAINNET binary for size; buying and selling a pump coin goes through token_buy / token_sell (Jupiter), which reaches both bonding-curve and graduated mints. Calling this against MAINNET fails with an unknown-instruction error. Grant-gated. Pump-trader PDA is pump user (invoke_signed trader seeds). remaining_accounts must be the official 27-account buy_v2 list with user=pump-trader (not SpendVault). Agent signs. Relayer fee-pays. Bot never holds SOL. Not a general router. Not Jupiter. 27 remaining accounts need a v0 tx + address lookup table on public RPC. Complete bonding curves cannot buy_v2.",
     {
       mint: pubkey.optional().describe("Base mint. Defaults to the documented Grok token CA (Token-2022)."),
       amount: z
@@ -182,7 +182,7 @@ function buildServer(): McpServer {
 
   server.tool(
     "pump_sell",
-    "Tight INTENTS pump.fun sell_v2 adapter. Live on MAINNET INTENTS 3HCErAF. Grant amount is 0 (tokens out, not SOL). Pump-trader PDA is pump user. remaining_accounts must be the official 26-account sell_v2 list with user=pump-trader. Not a general router. Limit orders are not implemented.",
+    "Tight INTENTS pump.fun sell_v2 adapter. NOT ON THE LIVE PROGRAM. The four pump TRADE ixs were cut from the MAINNET binary for size; buying and selling a pump coin goes through token_buy / token_sell (Jupiter), which reaches both bonding-curve and graduated mints. Calling this against MAINNET fails with an unknown-instruction error. Grant amount is 0 (tokens out, not SOL). Pump-trader PDA is pump user. remaining_accounts must be the official 26-account sell_v2 list with user=pump-trader. Not a general router. Limit orders are not implemented.",
     {
       mint: pubkey.optional().describe("Base mint. Defaults to the documented Grok token CA (Token-2022)."),
       amount: z
@@ -208,18 +208,22 @@ function buildServer(): McpServer {
 
   server.tool(
     "pump_create",
-    "Tight INTENTS pump.fun create_v2 adapter. Live on MAINNET INTENTS 3HCErAF. Grant-gated coin launch. Mint is a NEW Token-2022 keypair signed by the client (relayer/root) — this MCP never accepts or prints mint secret/keypair JSON. Pump-trader PDA is pump user (remaining[5]). SpendVault is never user. Creator on-chain is grok_account.root. remaining_accounts must be the official 16-account create_v2 list (or 19 with quote remaining). Agent signs. Relayer fee-pays. Bot never holds SOL. Not a general router.",
+    "Launch a coin on pump.fun (create_v2). Grant-gated. The mint keypair is generated here, signs once, and is never persisted or printed — create_v2 hands mint authority to pump.fun, so the key is worthless afterwards; pass mint_keypair_path only for a vanity address. remaining_accounts is OPTIONAL: omit it and the 16-account list is derived, taking its flags from a create_v2 pump.fun already accepted, with every PDA re-derived and checked. The pump-trader PDA is pump user (remaining[5]) and must already hold max_sol_cost — there is no in-instruction vault debit. SpendVault is never user. Creator on chain is grok_account.root, not the agent. Agent signs, relayer fee-pays, bot stays at 0 SOL. Jupiter cannot mint a coin, which is why this ix exists when the trade ixs do not.",
     {
-      mint: pubkey.describe("New Token-2022 mint pubkey. Client signs this keypair on the outer tx. Never a secret."),
       name: z.string().describe("Coin name. Maximum 32 characters."),
       symbol: z.string().describe("Coin symbol. Maximum 13 characters."),
       uri: z.string().describe("Metadata URI. Maximum 200 characters."),
       max_sol_cost: z
         .union([z.number().int().positive(), z.string()])
         .describe("Max SOL (lamports) the vault will spend for rent + create fees. This is the grant budget."),
+      mint_keypair_path: z
+        .string()
+        .optional()
+        .describe("PATH to a mint keypair file, for a vanity address (e.g. one ending in \"pump\"). Omit and a throwaway mint is generated for this launch. Never inline secret material."),
       remaining_accounts: z
         .array(z.union([pubkey, z.object({ pubkey, isSigner: z.boolean().optional(), isWritable: z.boolean().optional() })]))
-        .describe("Official create_v2 account list (16, or 19 with quote remaining). mint slot (0) must be a signer. user slot (5) must be the pump-trader PDA, not SpendVault. remaining[15] must be pump.fun."),
+        .optional()
+        .describe("OPTIONAL override of the create_v2 account list (16, or 19 with quote). Omit it and the list is derived from chain. Supply it and the flags are yours to get right — INTENTS passes them through untouched, so a wrong one is rejected by pump.fun after the mint keypair is already spent."),
       is_mayhem_mode: z.boolean().optional().describe("Official create_v2 is_mayhem_mode. Default false."),
       is_cashback_enabled: z.boolean().optional().describe("Official create_v2 OptionBool cashback flag. Default false."),
       sponsor_lamports: z
@@ -229,6 +233,16 @@ function buildServer(): McpServer {
       dry_run: z.boolean().optional(),
     },
     async (args) => jsonResult(await pumpCreateTool(args)),
+  );
+
+  server.tool(
+    "pump_create_derive",
+    "Read-only. Show the create_v2 account list a launch would submit, with the writable/signer flag on every slot and the transaction those flags came from. Signs nothing and spends no mint keypair. Worth running once before a first launch: it proves a template was found and that every derived PDA agrees with it, which is exactly what breaks if pump.fun changes its account layout.",
+    {
+      mint: pubkey.optional().describe("Mint to derive for. Omit and a placeholder is used, which is fine for checking the shape."),
+      root: pubkey.optional(),
+    },
+    async (args) => jsonResult(await pumpCreateDeriveTool(args)),
   );
 
   server.tool(
@@ -244,7 +258,7 @@ function buildServer(): McpServer {
 
   server.tool(
     "pump_amm_buy",
-    "Tight INTENTS PumpSwap buy_exact_quote_in adapter. Grant-gated. Live on MAINNET INTENTS 3HCErAF. Pump-trader PDA is remaining[1] user. SpendVault is never user. remaining_accounts is OPTIONAL — omit it and the list is built from chain state for this vault's pump-trader. If supplied it must be the official PumpSwap buy list 26 (non-cashback) or 27 (cashback). Do not use sell's 24. Agent signs. Relayer fee-pays. Agent stays 0 SOL. Not a general router. Not Jupiter. Curve pump_buy cannot hit a graduated mint.",
+    "Tight INTENTS PumpSwap buy_exact_quote_in adapter. NOT ON THE LIVE PROGRAM. The four pump TRADE ixs were cut from the MAINNET binary for size; buying and selling a pump coin goes through token_buy / token_sell (Jupiter), which reaches both bonding-curve and graduated mints. Calling this against MAINNET fails with an unknown-instruction error. Grant-gated. Pump-trader PDA is remaining[1] user. SpendVault is never user. remaining_accounts is OPTIONAL — omit it and the list is built from chain state for this vault's pump-trader. If supplied it must be the official PumpSwap buy list 26 (non-cashback) or 27 (cashback). Do not use sell's 24. Agent signs. Relayer fee-pays. Agent stays 0 SOL. Not a general router. Not Jupiter. Curve pump_buy cannot hit a graduated mint.",
     {
       mint: pubkey.optional().describe("Base mint. Defaults to the documented Grok token CA (Token-2022)."),
       spendable_quote_in: z
@@ -273,7 +287,7 @@ function buildServer(): McpServer {
 
   server.tool(
     "pump_amm_sell",
-    "Tight INTENTS PumpSwap sell adapter. Live on MAINNET INTENTS 3HCErAF. Grant amount is 0 (tokens out, not SOL). Pump-trader PDA is remaining[1] user. remaining_accounts is OPTIONAL — omit it and the list is built from chain state for this vault's pump-trader. If supplied it must be the official PumpSwap sell list 24 (no volume accs). Do not pass buy's 26/27. Quote unwrap stays on the trader, not the vault. Agent stays 0 SOL. Not a general router. Not Jupiter.",
+    "Tight INTENTS PumpSwap sell adapter. NOT ON THE LIVE PROGRAM. The four pump TRADE ixs were cut from the MAINNET binary for size; buying and selling a pump coin goes through token_buy / token_sell (Jupiter), which reaches both bonding-curve and graduated mints. Calling this against MAINNET fails with an unknown-instruction error. Grant amount is 0 (tokens out, not SOL). Pump-trader PDA is remaining[1] user. remaining_accounts is OPTIONAL — omit it and the list is built from chain state for this vault's pump-trader. If supplied it must be the official PumpSwap sell list 24 (no volume accs). Do not pass buy's 26/27. Quote unwrap stays on the trader, not the vault. Agent stays 0 SOL. Not a general router. Not Jupiter.",
     {
       mint: pubkey.optional().describe("Base mint. Defaults to the documented Grok token CA (Token-2022)."),
       base_amount_in: z

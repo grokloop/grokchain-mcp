@@ -15,7 +15,7 @@ import {
 import { dispatchIx, needHumanSetup } from "../send.js";
 import type { AppConfig } from "../config.js";
 import type { ToolResult } from "../types.js";
-import { PublicKey, type TransactionInstruction } from "@solana/web3.js";
+import { PublicKey, type TransactionInstruction, Keypair } from "@solana/web3.js";
 
 const BANNED_LOCAL_ONLY_IDS = new Set([
   LOCAL_ONLY_PROGRAM_ID,
@@ -71,6 +71,15 @@ export async function submitAgentIntent(opts: {
     agentPk: PublicKey;
     relayerPk?: PublicKey;
   }) => BuiltIntent;
+  /**
+   * Keypairs that must sign IN ADDITION to relayer + agent.
+   *
+   * Only pump_create needs this: pump.fun requires the new mint to sign its own
+   * creation, and that key belongs to neither the relayer nor the agent. It is
+   * ephemeral — generated for the launch, used once, never written to disk and
+   * never returned. Anything long-lived belongs in a keystore path, not here.
+   */
+  extraSigners?: Keypair[];
 }): Promise<ToolResult> {
   try {
     const ctx = openCtx(opts.raw);
@@ -153,7 +162,7 @@ export async function submitAgentIntent(opts: {
       ix: built.ix,
       feePayer: relayerPk,
       signer: ctx.relayer.keypair,
-      extraSigners: [ctx.agent.keypair],
+      extraSigners: [ctx.agent.keypair, ...(opts.extraSigners ?? [])],
       signerRole: "relayer",
       dryRun: opts.raw.dry_run,
       extra: { ...extra, fee_payer: relayerPk.toBase58() },

@@ -469,6 +469,13 @@ function pumpMouthKeys(opts: {
   // Always attach the relayer as fee_payer when present so ATA create can pay rent.
   const feePayerKey = opts.feePayer ?? sk.feePayerKey;
   const feePayerSigner = !!opts.feePayer;
+  // ORDER IS THE PumpTrade STRUCT, EXACTLY. Ten accounts, and the pump-trader
+  // PDA is NOT one of them: it reaches the program through remaining_accounts
+  // only (index 13 for buy/sell, 5 for create). Naming it here as well made it
+  // a named+remaining duplicate of the same writable system account, which the
+  // program warns turns a later system CPI into UnbalancedInstruction — and
+  // shifted every account after it by one, so the program read the trader where
+  // it expected system_program and failed with InvalidProgramId (3008).
   return [
     meta(opts.agent, true, false),
     meta(opts.grokAccount, false, false),
@@ -476,7 +483,6 @@ function pumpMouthKeys(opts: {
     meta(opts.coreProgramId, false, false),
     meta(opts.intentsProgramId, false, false),
     meta(opts.spendVault, false, true),
-    meta(opts.pumpTrader, false, true),
     meta(SystemProgram.programId, false, false),
     meta(new PublicKey(PUMP_PROGRAM_ID), false, false),
     meta(sk.paymasterKey, false, true),

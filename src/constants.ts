@@ -33,6 +33,8 @@ export const SEED_MERCHANTS = Buffer.from("merchants");
 export const MAX_MERCHANTS = 32;
 /** One subscription per (merchant, mint) under a GrokAccount. */
 export const SEED_SUBSCRIPTION = Buffer.from("subscription");
+/** One sub-grant per agent per GrokAccount, under INTENTS. */
+export const SEED_SUB_GRANT = Buffer.from("sub-grant");
 
 export const SEED_PUMP_TRADER = Buffer.from("pump-trader");
 
@@ -73,6 +75,11 @@ export const INTENTS_DISC = {
   pump_create: Buffer.from([24, 176, 142, 141, 243, 152, 56, 128]),
   pump_amm_buy: Buffer.from([129, 59, 179, 195, 110, 135, 61, 2]),
   pump_amm_sell: Buffer.from([238, 234, 142, 38, 107, 206, 76, 195]),
+  // Sub-grants. NOT on the deployed binary — these will fail with an unknown
+  // instruction until INTENTS is upgraded.
+  issue_sub_grant: Buffer.from([70, 3, 13, 77, 155, 184, 166, 177]),
+  revise_sub_grant: Buffer.from([10, 206, 227, 230, 30, 200, 30, 197]),
+  revoke_sub_grant: Buffer.from([175, 168, 35, 194, 158, 69, 17, 147]),
   withdraw_pump_trader: Buffer.from([188, 237, 135, 114, 143, 224, 45, 178]),
   // pay_token + merchant allowlist. Require an INTENTS upgrade.
   pay_token: Buffer.from([165, 233, 248, 250, 110, 155, 215, 142]),
